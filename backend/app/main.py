@@ -5,18 +5,25 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db.database import engine, Base
+from app.db.redis import get_redis, close_redis
 import app.models  # noqa: F401 — registra tutti i modelli con Base
 
-
+###############---############
+# REMEMBER TO SWITCH TO Alembic migrations IN PROD
+###############---############
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # All'avvio: crea le tabelle nel DB se non esistono ancora.
-    # In produzione si userebbe Alembic per le migrazioni;
-    # per ora create_all() è sufficiente.
+    # Startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    redis = await get_redis()
+    await redis.ping()  # verifica connessione Redis all'avvio
+
     yield
-    # Alla chiusura: nessuna operazione necessaria per ora.
+
+    # Shutdown
+    await close_redis()
 
 
 app = FastAPI(
