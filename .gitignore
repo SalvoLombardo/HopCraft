@@ -121,3 +121,7 @@ temp/
 # ================================
 # Decommenta se non vuoi committare il CSV degli aeroporti
 # data/airports.dat
+
+
+CHECKLIST.md 
+Structure.md

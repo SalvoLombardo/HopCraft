@@ -1,0 +1,17 @@
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# Configurazione da variabili d'ambiente
+pydantic-settings>=2.5.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.30.0
+alembic>=1.14.0
+
+# Cache
+redis>=5.0.0
+
+# HTTP client asincrono (per chiamate a Tequila API e AI)
+httpx>=0.28.0

@@ -10,18 +10,18 @@
 
 ### 1.1 Setup progetto
 - [x] Creare struttura cartelle come da Structure.md
-- [ ] Inizializzare repo Git
+- [x] Inizializzare repo Git e GitHub
 - [x] Creare `docker-compose.yml` (backend + frontend + postgres + redis)
 - [x] Creare `.env.example` con tutte le variabili necessarie
 - [ ] Creare `.env` locale con i valori reali (non committare)
 - [ ] Verificare che `docker compose up` avvii tutti i servizi senza errori
 
 ### 1.2 Backend — Boilerplate FastAPI
-- [ ] Creare `backend/requirements.txt` con le dipendenze base
-- [ ] Creare `backend/Dockerfile`
-- [ ] Scrivere `app/main.py` con FastAPI + CORS
-- [ ] Scrivere `app/config.py` con lettura variabili d'ambiente
-- [ ] Endpoint `/api/v1/health` funzionante
+- [x] Creare `backend/requirements.txt` con le dipendenze base
+- [x] Creare `backend/Dockerfile`
+- [x] Scrivere `app/main.py` con FastAPI + CORS
+- [x] Scrivere `app/config.py` con lettura variabili d'ambiente
+- [x] Endpoint `/api/v1/health` funzionante
 - [ ] Verificare che il backend risponda su `localhost:8000`
 
 ### 1.3 Database — PostgreSQL
@@ -42,17 +42,21 @@
 - [ ] Scrivere `app/db/redis.py` con connessione Redis
 - [ ] Verificare connessione Redis con un ping
 
-### 1.6 Tequila API (Kiwi.com)
-- [ ] Registrarsi su tequila.kiwi.com e ottenere API key
-- [ ] Scrivere `app/services/tequila.py` — client asincrono
-- [ ] Testare una chiamata manuale all'API (es. voli da Milano a Catania)
-- [ ] Gestire errori e timeout
+### 1.6 Flight Provider Layer (Strategy Pattern)
+- [ ] Creare cartella `app/services/providers/` con `__init__.py`
+- [ ] Scrivere `providers/base.py` — classi astratte `FlightProvider`, `FlightOffer`, `Leg`
+- [ ] Scrivere `providers/google_flights.py` — `GoogleFlightsProvider` (primario, gratuito)
+- [ ] Scrivere `providers/amadeus.py` — `AmadeusProvider` (fallback, API ufficiale)
+- [ ] Scrivere `providers/tequila.py` — `TequilaProvider` (placeholder vuoto per uso futuro)
+- [ ] Scrivere `providers/factory.py` — legge `FLIGHT_PROVIDER` dall'env e restituisce provider
+- [ ] Testare una chiamata con GoogleFlightsProvider (es. voli da Milano a Catania)
+- [ ] Gestire errori e timeout nel provider
 
 ### 1.7 Cache layer
 - [ ] Implementare logica cache in PostgreSQL (`flight_cache`) con TTL 6-12h
-- [ ] Prima di ogni chiamata Tequila, controllare se il risultato è in cache
-- [ ] Scrivere in cache dopo ogni chiamata API
-- [ ] Scrivere `app/utils/rate_limiter.py` per rispettare i 100 req/min
+- [ ] Prima di ogni chiamata al provider, controllare se il risultato è in cache
+- [ ] Scrivere in cache dopo ogni chiamata
+- [ ] Scrivere `app/utils/rate_limiter.py` per eventuali rate limit
 
 ### 1.8 Endpoint Reverse Search
 - [ ] Scrivere `app/services/search_engine.py` — logica core reverse search
@@ -85,8 +89,8 @@
 - [ ] Testare con diversi valori di durata (5, 12, 25 giorni)
 
 ### 2.2 AI per suggerimento itinerari
-- [ ] Scegliere il modello AI gratuito da usare (decidere con il prossimo lavoro)
-- [ ] Scrivere `app/services/claude.py` (o rinominare in base al modello scelto)
+- [ ] Scegliere il modello AI gratuito da usare (candidati: Groq, Gemini)
+- [ ] Scrivere `app/services/ai_client.py`
 - [ ] Implementare il prompt strutturato come da Structure.md
 - [ ] Testare che l'output sia JSON valido con rotte plausibili
 
@@ -94,7 +98,7 @@
 - [ ] Scrivere `app/services/itinerary_engine.py`
   - [ ] Step 1: calcolo raggio e filtraggio aeroporti
   - [ ] Step 2: chiamata AI → lista itinerari candidati
-  - [ ] Step 3: verifica prezzi reali (chiamate Tequila parallele asincronie)
+  - [ ] Step 3: verifica prezzi reali via Flight Provider (chiamate parallele asincrone)
   - [ ] Step 4: filtraggio per budget + ranking
   - [ ] Step 5: preparazione risposta top 5
 
@@ -119,7 +123,7 @@
 - [ ] Aggiungere stati di caricamento (skeleton/spinner) e messaggi di errore utente
 
 ### 3.2 Error Handling
-- [ ] Gestire API Tequila down (fallback, messaggio chiaro)
+- [ ] Gestire Flight Provider down (fallback su provider alternativo, messaggio chiaro)
 - [ ] Gestire risultati vuoti (zero voli trovati)
 - [ ] Gestire timeout su chiamate lente
 - [ ] Gestire errori AI (risposta non JSON, rotte invalide)
@@ -156,3 +160,4 @@
 |------|------|
 | 2026-02-23 | Creazione checklist. Progetto ancora vuoto. Nome app: HopCraft. AI model da decidere (deve essere gratuito). |
 | 2026-02-23 | Creata struttura cartelle completa, docker-compose.yml (con PostgreSQL + Redis), .gitignore, .env.example. Redis mantenuto per ora su richiesta. Prossimo passo: boilerplate FastAPI (1.2). |
+| 2026-02-23 | Tequila API non più accessibile gratuitamente. Adottato Strategy Pattern per il Flight Provider Layer: GoogleFlightsProvider (primario, gratuito, scraping via libreria PyPI) + AmadeusProvider (fallback, API ufficiale ma senza low-cost EU nel tier free). Structure.md, CHECKLIST.md e .env.example aggiornati di conseguenza. |

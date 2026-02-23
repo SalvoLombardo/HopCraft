@@ -11,8 +11,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app   # hot reload in sviluppo
     restart: unless-stopped
 
   frontend:
@@ -21,9 +19,6 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app  # hot reload in sviluppo
-      - /app/node_modules
     restart: unless-stopped
 
   db:
