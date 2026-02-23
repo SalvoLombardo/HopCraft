@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   backend:
     build: ./backend
@@ -13,13 +11,14 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    restart: unless-stopped
+  # Frontend commentato: non ancora inizializzato (Fase 1.10)
+  # frontend:
+  #   build: ./frontend
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - backend
+  #   restart: unless-stopped
 
   db:
     image: postgres:16-alpine

@@ -9,13 +9,16 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str
 
-    # Tequila API
-    tequila_api_key: str
-    tequila_base_url: str = "https://api.tequila.kiwi.com/v2"
+    # Flight Provider
+    flight_provider: str = "google_flights"
+    amadeus_api_key: str = ""
+    amadeus_api_secret: str = ""
 
-    # AI model 
-    ai_api_key: str = ""
-    ai_model: str = "da_definire"
+    # LLM Provider
+    llm_provider: str = "gemini"
+    gemini_api_key: str = ""
+    groq_api_key: str = ""
+    mistral_api_key: str = ""
 
     # App
     app_env: str = "development"
@@ -26,5 +29,5 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 
-# Globbal instance for the entire project
+# Istanza globale usata in tutto il progetto
 settings = Settings()
