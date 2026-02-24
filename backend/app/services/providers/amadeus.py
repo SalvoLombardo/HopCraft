@@ -1,14 +1,20 @@
 """
-AmadeusProvider — fallback provider (official, stable API).
+AmadeusProvider — provider primario (API ufficiale, stabile).
 
-Uses the Amadeus Self-Service API (free tier: 2,000 requests/month).
-LIMITATION: the free tier does NOT include European low-cost airlines
-(Ryanair, Wizz Air, easyJet), so prices are incomplete
-for HopCraft’s main use case.
+Usa l’Amadeus Self-Service API (free tier: 2.000 richieste/mese).
+LIMITAZIONE: il free tier NON include le compagnie low-cost europee
+(Ryanair, Wizz Air, easyJet). Copre le major carriers (Lufthansa,
+Air France, Iberia, British Airways, Alitalia, ecc.).
 
-Documentation: https://developers.amadeus.com/self-service/category/flights
+Ottimizzazione token: il token OAuth2 (valido ~30 min) è cachato a livello
+di modulo per evitare una POST /oauth2/token extra ad ogni ricerca.
+Senza cache: 2 richieste API per origine (auth + search).
+Con cache: 1 richiesta API per origine + 1 auth ogni 30 min.
+
+Documentazione: https://developers.amadeus.com/self-service/category/flights
 """
 import re
+import time
 from datetime import date
 
 import httpx
@@ -17,6 +23,9 @@ from app.services.providers.base import FlightOffer, FlightProvider, Leg
 
 _AUTH_URL = "https://test.api.amadeus.com/v1/security/oauth2/token"
 _SEARCH_URL = "https://test.api.amadeus.com/v2/shopping/flight-offers"
+
+# Cache token a livello di modulo: api_key → (token, expires_at_monotonic)
+_TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 
 
 def _parse_iso_duration(duration: str) -> int:
@@ -54,6 +63,11 @@ class AmadeusProvider(FlightProvider):
         self.api_secret = api_secret
 
     async def _get_token(self, client: httpx.AsyncClient) -> str:
+        now = time.monotonic()
+        cached = _TOKEN_CACHE.get(self.api_key)
+        if cached and now < cached[1] - 60:   # 60s di margine prima della scadenza
+            return cached[0]
+
         resp = await client.post(
             _AUTH_URL,
             data={
@@ -64,7 +78,11 @@ class AmadeusProvider(FlightProvider):
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         resp.raise_for_status()
-        return resp.json()["access_token"]
+        data = resp.json()
+        token: str = data["access_token"]
+        expires_in: int = int(data.get("expires_in", 1799))
+        _TOKEN_CACHE[self.api_key] = (token, now + expires_in)
+        return token
 
     async def search_one_way(
         self,

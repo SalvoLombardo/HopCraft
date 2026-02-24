@@ -19,6 +19,11 @@ class AirportOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AirportNearbyOut(AirportOut):
+    #distance from airpot as main point
+    distance_km: int
+
+
 # ---------------------------------------------------------------------------
 # The result for a single flight(used in the reverse search)
 # ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db.database import engine, Base
 from app.db.redis import get_redis, close_redis
+from app.api.v1.router import api_router
 import app.models  # noqa: F401 — registra tutti i modelli con Base
 
 ###############---############
@@ -39,6 +40,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(api_router)
 
 
 @app.get("/api/v1/health")
