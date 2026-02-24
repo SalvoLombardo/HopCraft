@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     # Flight Provider
     flight_provider: str = "google_flights"
+    serpapi_api_key: str = ""          
     amadeus_api_key: str = ""
     amadeus_api_secret: str = ""
 

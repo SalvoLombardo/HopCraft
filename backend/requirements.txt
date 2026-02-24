@@ -13,5 +13,9 @@ alembic>=1.14.0
 # Cache
 redis>=5.0.0
 
-# HTTP client asincrono (per chiamate a Tequila API e AI)
+# HTTP client asincrono (per chiamate ad API esterne e AI)
 httpx>=0.28.0
+
+# Flight providers
+# fast-flights rimosso: non funziona da ambienti server (Google GDPR consent wall)
+# GoogleFlightsProvider usa SerpAPI via httpx (già incluso sopra)
