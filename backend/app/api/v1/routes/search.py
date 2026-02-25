@@ -7,6 +7,9 @@ GET /api/v1/search/reverse
   &date_to=2026-04-03
   &direct_only=false
   &max_results=50
+  &origin_lat=52.3     (opzionale — con origin_lon e radius_km restringe la ricerca per area)
+  &origin_lon=4.9
+  &radius_km=600
 """
 from datetime import date, datetime
 from typing import Annotated
@@ -31,11 +34,16 @@ async def search_reverse(
     date_to: Annotated[date, Query(description="Data partenza massima (YYYY-MM-DD)")],
     direct_only: Annotated[bool, Query(description="Solo voli diretti")] = False,
     max_results: Annotated[int, Query(ge=1, le=200, description="Numero massimo risultati")] = 50,
+    origin_lat: Annotated[float | None, Query(ge=-90, le=90, description="Latitudine area di partenza")] = None,
+    origin_lon: Annotated[float | None, Query(ge=-180, le=180, description="Longitudine area di partenza")] = None,
+    radius_km: Annotated[int | None, Query(ge=50, le=5000, description="Raggio in km dall'area di partenza")] = None,
 ) -> ReverseSearchOut:
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from deve essere <= date_to")
     if (date_to - date_from).days > 6:
         raise HTTPException(status_code=422, detail="Il range massimo è 7 giorni")
+    if (origin_lat is None) != (origin_lon is None):
+        raise HTTPException(status_code=422, detail="origin_lat e origin_lon devono essere forniti insieme")
 
     results, cached, fetched_at = await reverse_search(
         session=session,
@@ -44,6 +52,9 @@ async def search_reverse(
         date_to=date_to,
         direct_only=direct_only,
         max_results=max_results,
+        origin_lat=origin_lat,
+        origin_lon=origin_lon,
+        radius_km=radius_km,
     )
 
     if not results:

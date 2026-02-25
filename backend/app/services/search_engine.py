@@ -24,6 +24,7 @@ from app.models.flight_cache import FlightCache
 from app.services.cache import save_to_cache
 from app.services.providers.base import FlightOffer
 from app.services.providers.factory import get_flight_provider
+from app.utils.geo import haversine_km
 from app.utils.rate_limiter import check_rate_limit
 
 # Nuove chiamate al provider massime per singola ricerca
@@ -45,25 +46,39 @@ async def reverse_search(
     date_to: date,
     direct_only: bool = False,
     max_results: int = 50,
+    origin_lat: float | None = None,
+    origin_lon: float | None = None,
+    radius_km: int | None = None,
 ) -> tuple[list[dict], bool, datetime]:
     """
     Reverse search: trova i voli più economici verso destination da tutti gli aeroporti attivi.
+
+    Parametri opzionali di filtraggio geografico:
+        origin_lat / origin_lon / radius_km — se forniti, restringe la ricerca agli aeroporti
+        entro radius_km dal punto indicato. Riduce drasticamente le chiamate al provider
+        quando l'utente sa già in quale area si trova (es. Europa del Nord).
 
     Returns:
         (lista risultati, all_from_cache, fetched_at)
         Ogni elemento della lista è un dict compatibile con FlightOfferOut.
     """
 
-
-    # --- 1. Uploading all airport obj (exept for not active and dastination himself)  
-    #        packing like {"IATACODE":<Airport obj>, ecc}  
+    # --- 1. Carica tutti gli aeroporti attivi (esclusa la destinazione stessa)
     stmt_airports = select(Airport).where(
         Airport.is_active.is_(True),
         Airport.iata_code != destination,
     )
-    airport_rows = await session.execute(stmt_airports)#Gives a tuple, nedd to take the first(scalar)
+    airport_rows = await session.execute(stmt_airports)
     airports: list[Airport] = list(airport_rows.scalars().all())
-    airport_map: dict[str, Airport] = {a.iata_code: a for a in airports} #Creating final dict w/ {"CTA": <Airport obj>,ecc}
+    airport_map: dict[str, Airport] = {a.iata_code: a for a in airports}
+
+    # --- 1b. Filtraggio per raggio geografico (opzionale)
+    if origin_lat is not None and origin_lon is not None and radius_km is not None:
+        airport_map = {
+            code: airport
+            for code, airport in airport_map.items()
+            if haversine_km(origin_lat, origin_lon, airport.latitude, airport.longitude) <= radius_km
+        }
 
 
 

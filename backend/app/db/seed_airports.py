@@ -17,22 +17,29 @@ AIRPORTS_URL = (
     "https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat"
 )
 
-# Paesi europei + Nord Africa (Tunisia, Marocco, Egitto) per coprire destinazioni
-# raggiungibili con low-cost europee
-EUROPEAN_COUNTRIES = {
-    "Albania", "Andorra", "Austria", "Belarus", "Belgium",
-    "Bosnia and Herzegovina", "Bulgaria", "Croatia", "Cyprus",
-    "Czech Republic", "Denmark", "Estonia", "Finland", "France",
-    "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Italy",
-    "Kosovo", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg",
-    "Malta", "Moldova", "Monaco", "Montenegro", "Netherlands",
-    "North Macedonia", "Norway", "Poland", "Portugal", "Romania",
-    "Russia", "San Marino", "Serbia", "Slovakia", "Slovenia",
-    "Spain", "Sweden", "Switzerland", "Turkey", "Ukraine",
-    "United Kingdom", "Vatican City",
-    # Nord Africa — destinazioni comuni low-cost
-    "Morocco", "Tunisia", "Egypt",
+# Mapping paese → codice continente ISO (EU, AF, AS, NA, SA, OC)
+# Copre tutti i paesi presenti nel seed attuale.
+COUNTRY_CONTINENT: dict[str, str] = {
+    # Europa
+    "Albania": "EU", "Andorra": "EU", "Austria": "EU", "Belarus": "EU",
+    "Belgium": "EU", "Bosnia and Herzegovina": "EU", "Bulgaria": "EU",
+    "Croatia": "EU", "Cyprus": "EU", "Czech Republic": "EU", "Denmark": "EU",
+    "Estonia": "EU", "Finland": "EU", "France": "EU", "Germany": "EU",
+    "Greece": "EU", "Hungary": "EU", "Iceland": "EU", "Ireland": "EU",
+    "Italy": "EU", "Kosovo": "EU", "Latvia": "EU", "Liechtenstein": "EU",
+    "Lithuania": "EU", "Luxembourg": "EU", "Malta": "EU", "Moldova": "EU",
+    "Monaco": "EU", "Montenegro": "EU", "Netherlands": "EU",
+    "North Macedonia": "EU", "Norway": "EU", "Poland": "EU", "Portugal": "EU",
+    "Romania": "EU", "Russia": "EU", "San Marino": "EU", "Serbia": "EU",
+    "Slovakia": "EU", "Slovenia": "EU", "Spain": "EU", "Sweden": "EU",
+    "Switzerland": "EU", "Turkey": "EU", "Ukraine": "EU",
+    "United Kingdom": "EU", "Vatican City": "EU",
+    # Nord Africa — destinazioni comuni low-cost europee
+    "Morocco": "AF", "Tunisia": "AF", "Egypt": "AF",
 }
+
+# Paesi inclusi nel seed (chiavi del mapping sopra)
+EUROPEAN_COUNTRIES = set(COUNTRY_CONTINENT.keys())
 
 
 async def seed() -> None:
@@ -68,6 +75,7 @@ async def seed() -> None:
                 "name": row[1].strip('"'),
                 "city": row[2].strip('"'),
                 "country": country,
+                "continent": COUNTRY_CONTINENT.get(country),
                 "latitude": lat,
                 "longitude": lon,
                 "is_active": True,

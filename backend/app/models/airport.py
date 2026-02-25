@@ -11,6 +11,8 @@ class Airport(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     city: Mapped[str] = mapped_column(String(255), nullable=False)
     country: Mapped[str] = mapped_column(String(100), nullable=False)
+    # Codice continente ISO: EU, AF, AS, NA, SA, OC
+    continent: Mapped[str | None] = mapped_column(String(2), nullable=True)
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
