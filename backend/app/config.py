@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     redis_url: str
 
     # Flight Provider
-    flight_provider: str = "google_flights"
+    flight_provider: str = "amadeus"
     serpapi_api_key: str = ""          
     amadeus_api_key: str = ""
     amadeus_api_secret: str = ""

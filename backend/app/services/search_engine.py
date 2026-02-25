@@ -13,7 +13,7 @@ attivo (es. "amadeus:monthly") per evitare conflitti se si switcha provider.
 Amadeus free tier: 2.000 req/mese → limite impostato a 1.800 (10% di margine).
 """
 import asyncio
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +35,7 @@ _MONTHLY_WINDOW = 30 * 24 * 3600
 
 
 def _cache_cutoff() -> datetime:
-    return datetime.utcnow() - timedelta(hours=settings.cache_ttl_hours)
+    return datetime.now(timezone.utc) - timedelta(hours=settings.cache_ttl_hours)
 
 
 async def reverse_search(
@@ -53,23 +53,28 @@ async def reverse_search(
         (lista risultati, all_from_cache, fetched_at)
         Ogni elemento della lista è un dict compatibile con FlightOfferOut.
     """
-    # --- 1. Carica tutti gli aeroporti attivi (esclusa la destinazione stessa) ---
+
+
+    # --- 1. Uploading all airport obj (exept for not active and dastination himself)  
+    #        packing like {"IATACODE":<Airport obj>, ecc}  
     stmt_airports = select(Airport).where(
         Airport.is_active.is_(True),
         Airport.iata_code != destination,
     )
-    airport_rows = await session.execute(stmt_airports)
+    airport_rows = await session.execute(stmt_airports)#Gives a tuple, nedd to take the first(scalar)
     airports: list[Airport] = list(airport_rows.scalars().all())
-    airport_map: dict[str, Airport] = {a.iata_code: a for a in airports}
+    airport_map: dict[str, Airport] = {a.iata_code: a for a in airports} #Creating final dict w/ {"CTA": <Airport obj>,ecc}
 
-    # --- 2. Costruisce la lista di date nel range (max 7) ---
+
+
+    # --- 2. Building 7days range 
     date_list: list[date] = []
     current = date_from
     while current <= date_to and len(date_list) < 7:
         date_list.append(current)
         current += timedelta(days=1)
 
-    # --- 3. Batch query cache: tutti i risultati validi per questa destinazione/date ---
+    # --- 3. Checking in cache for (date_list), we are searching just the destination (not origin and destination)
     stmt_cache = select(FlightCache).where(
         FlightCache.destination == destination,
         FlightCache.departure_date.in_(date_list),
@@ -79,21 +84,21 @@ async def reverse_search(
 
     # Per ogni origine, tieni solo l'offerta più economica fra tutte le date in cache
     cache_best: dict[str, tuple[FlightOffer, datetime]] = {}
-    for row in cache_rows.scalars():
-        offers = [FlightOffer(**item) for item in (row.raw_response or [])]
+    for single_flight_cache_obj in cache_rows.scalars():
+        offers = [FlightOffer(**item) for item in (single_flight_cache_obj.raw_response or [])]
         if not offers:
             continue
         cheapest = min(offers, key=lambda o: o.price_eur)
-        prev = cache_best.get(row.origin)
+        prev = cache_best.get(single_flight_cache_obj.origin)
         if prev is None or cheapest.price_eur < prev[0].price_eur:
-            cache_best[row.origin] = (cheapest, row.fetched_at)
+            cache_best[single_flight_cache_obj.origin] = (cheapest, single_flight_cache_obj.fetched_at)
 
-    # --- 4. Identifica le origini senza cache ---
+    # --- 4. Using 'set difference' to find wich origin airport is not in cache 
     all_origins = set(airport_map.keys())
     cached_origins = set(cache_best.keys())
-    missing_origins = list(all_origins - cached_origins)[:_MAX_NEW_CALLS_PER_SEARCH]
+    missing_origins = list(all_origins - cached_origins)[:_MAX_NEW_CALLS_PER_SEARCH] #slicing until target
 
-    # --- 5. Fetch parallelo per le origini mancanti (con rate limit) ---
+    # --- 5. Parallel fetch for missing origins (with rate limit) ---
     provider = get_flight_provider()
     fresh_best: dict[str, FlightOffer] = {}
 
@@ -109,18 +114,21 @@ async def reverse_search(
             )
             if not offers:
                 return
-            # Salva in cache suddividendo per data
-            for d in date_list:
-                day_offers = [o for o in offers if o.departure.startswith(d.isoformat())]
+            
+            
+
+            #####Saving in cache but based on every single date
+            for single_date in date_list:
+                day_offers = [o for o in offers if o.departure.startswith(single_date.isoformat())]
                 if day_offers:
-                    await save_to_cache(session, origin, destination, d, day_offers)
-            fresh_best[origin] = min(offers, key=lambda o: o.price_eur)
+                    await save_to_cache(session, origin, destination, single_date, day_offers)
+            fresh_best[origin] = min(offers, key=lambda o: o.price_eur)#best price 
         except Exception:
             pass
 
     await asyncio.gather(*[_fetch(o) for o in missing_origins])
 
-    # --- 6. Assembla la risposta con coordinate aeroporto ---
+    # --- 6. Assembling the answer with airport coordinates 
     results: list[dict] = []
 
     for origin, (offer, fetched_at) in cache_best.items():
@@ -128,7 +136,7 @@ async def reverse_search(
         if airport:
             results.append(_build_result(offer, airport, fetched_at))
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for origin, offer in fresh_best.items():
         airport = airport_map.get(origin)
         if airport:
@@ -151,13 +159,13 @@ def _build_result(offer: FlightOffer, airport: Airport, fetched_at: datetime) ->
     return {
         "origin": offer.origin,
         "origin_city": airport.city,
-        "price_eur": float(offer.price_eur),
+        "price_eur": offer.price_eur,
         "airline": offer.airline,
         "departure": offer.departure,
         "direct": offer.direct,
         "duration_minutes": offer.duration_minutes,
-        "latitude": float(airport.latitude),
-        "longitude": float(airport.longitude),
+        "latitude": airport.latitude,
+        "longitude": airport.longitude,
         # Campo interno per estrarre fetched_at dal primo risultato
         "_fetched_at": fetched_at,
     }

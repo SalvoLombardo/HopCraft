@@ -12,10 +12,10 @@ from app.services.providers.amadeus import AmadeusProvider
 
 
 def get_flight_provider() -> FlightProvider:
-    if settings.flight_provider == "amadeus":
-        return AmadeusProvider(
-            api_key=settings.amadeus_api_key,
-            api_secret=settings.amadeus_api_secret,
-        )
-    # default: google_flights
-    return GoogleFlightsProvider()
+    if settings.flight_provider == "google_flights":
+        return GoogleFlightsProvider()
+    # default: amadeus
+    return AmadeusProvider(
+        api_key=settings.amadeus_api_key,
+        api_secret=settings.amadeus_api_secret,
+    )

@@ -10,7 +10,7 @@ La tabella flight_cache ha UNIQUE su (origin, destination, departure_date):
 ogni tuple ha un solo record, aggiornato in-place quando la cache scade.
 """
 from dataclasses import asdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -26,7 +26,7 @@ def _cutoff() -> datetime:
     if the FlightCache.fetched_at(see below async def get_cached ) is later of our cutoff 
     In this way if FlightCache.fetched_at >= _cutoff() it will means that the data is still valueable and usable
     """
-    return datetime.utcnow() - timedelta(hours=settings.cache_ttl_hours)
+    return datetime.now(timezone.utc) - timedelta(hours=settings.cache_ttl_hours)
 
 
 
@@ -94,7 +94,7 @@ async def save_to_cache(
 
     cheapest = min(offers, key=lambda o: o.price_eur)
     raw = [asdict(o) for o in offers]
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     stmt = (
         insert(FlightCache)
