@@ -36,7 +36,9 @@ _MONTHLY_WINDOW = 30 * 24 * 3600
 
 
 def _cache_cutoff() -> datetime:
-    return datetime.now(timezone.utc) - timedelta(hours=settings.cache_ttl_hours)
+    # .replace(tzinfo=None): PostgreSQL TIMESTAMP WITHOUT TIME ZONE richiede datetime naive.
+    # Calcoliamo in UTC e poi strippiamo tzinfo prima di passarlo a asyncpg.
+    return (datetime.now(timezone.utc) - timedelta(hours=settings.cache_ttl_hours)).replace(tzinfo=None)
 
 
 async def reverse_search(

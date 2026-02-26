@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel
 
 
@@ -73,6 +73,16 @@ class ItineraryOut(BaseModel):
     legs: list[LegOut]
     ai_notes: str
     suggested_days_per_stop: list[int]
+
+
+class SmartMultiIn(BaseModel):
+    origin: str
+    trip_duration_days: int
+    budget_per_person_eur: float
+    travelers: int
+    date_from: date
+    date_to: date
+    direct_only: bool = False
 
 
 class SmartMultiOut(BaseModel):

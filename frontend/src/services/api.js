@@ -37,3 +37,29 @@ export async function searchReverse({ destination, dateFrom, dateTo, directOnly,
 
   return res.json()
 }
+
+/**
+ * Smart Multi-City: propone itinerari multi-città ottimizzati via AI.
+ */
+export async function searchSmartMulti({ origin, tripDurationDays, budgetPerPerson, travelers, dateFrom, dateTo, directOnly }) {
+  const res = await fetch(`${BASE}/search/smart-multi`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      origin,
+      trip_duration_days: tripDurationDays,
+      budget_per_person_eur: budgetPerPerson,
+      travelers,
+      date_from: dateFrom,
+      date_to: dateTo,
+      direct_only: directOnly,
+    }),
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(body.detail || `Errore ${res.status}`)
+  }
+
+  return res.json()
+}

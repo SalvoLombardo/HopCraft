@@ -47,7 +47,7 @@ class GroqProvider(LLMProvider):
             "response_format": {"type": "json_object"},
         }
 
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 _API_URL,
                 headers={"Authorization": f"Bearer {self._api_key}"},

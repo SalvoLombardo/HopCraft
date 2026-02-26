@@ -18,8 +18,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_session
-from app.models.schemas import FlightOfferOut, ReverseSearchOut
+from app.models.schemas import FlightOfferOut, ReverseSearchOut, SmartMultiIn, SmartMultiOut
 from app.services.search_engine import reverse_search
+from app.services.itinerary_engine import run_smart_multi
 
 router = APIRouter()
 
@@ -81,3 +82,47 @@ async def search_reverse(
         cached=cached,
         fetched_at=fetched_at,
     )
+
+
+@router.post("/smart-multi", response_model=SmartMultiOut)
+async def search_smart_multi(
+    session: SessionDep,
+    body: SmartMultiIn,
+) -> SmartMultiOut:
+    """
+    Smart Multi-City: dato origine, durata, budget e date restituisce
+    i top 5 itinerari multi-città ottimizzati con prezzi reali.
+    """
+    # Validazioni di business
+    if body.trip_duration_days < 5 or body.trip_duration_days > 25:
+        raise HTTPException(status_code=422, detail="trip_duration_days deve essere tra 5 e 25")
+    if body.budget_per_person_eur <= 0:
+        raise HTTPException(status_code=422, detail="budget_per_person_eur deve essere positivo")
+    if body.travelers < 1:
+        raise HTTPException(status_code=422, detail="travelers deve essere almeno 1")
+    if body.date_from >= body.date_to:
+        raise HTTPException(status_code=422, detail="date_from deve essere < date_to")
+
+    try:
+        result = await run_smart_multi(
+            session=session,
+            origin=body.origin.upper(),
+            trip_duration_days=body.trip_duration_days,
+            budget_per_person_eur=body.budget_per_person_eur,
+            travelers=body.travelers,
+            date_from=body.date_from,
+            date_to=body.date_to,
+            direct_only=body.direct_only,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    if not result.itineraries:
+        raise HTTPException(
+            status_code=404,
+            detail="Nessun itinerario trovato nel budget indicato. Prova ad aumentare il budget o la durata.",
+        )
+
+    return result

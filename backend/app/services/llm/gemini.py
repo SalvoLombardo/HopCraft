@@ -49,7 +49,7 @@ class GeminiProvider(LLMProvider):
             },
         }
 
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 _API_URL,
                 params={"key": self._api_key},

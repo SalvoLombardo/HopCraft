@@ -26,7 +26,7 @@ def _cutoff() -> datetime:
     if the FlightCache.fetched_at(see below async def get_cached ) is later of our cutoff 
     In this way if FlightCache.fetched_at >= _cutoff() it will means that the data is still valueable and usable
     """
-    return datetime.now(timezone.utc) - timedelta(hours=settings.cache_ttl_hours)
+    return (datetime.now(timezone.utc) - timedelta(hours=settings.cache_ttl_hours)).replace(tzinfo=None)
 
 
 
@@ -94,7 +94,7 @@ async def save_to_cache(
 
     cheapest = min(offers, key=lambda o: o.price_eur)
     raw = [asdict(o) for o in offers]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     stmt = (
         insert(FlightCache)

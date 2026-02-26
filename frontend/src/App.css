@@ -278,3 +278,193 @@
   color: #b2bec3;
   margin-left: 4px;
 }
+
+/* ── Mode tabs ───────────────────────────────────── */
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.mode-tab {
+  padding: 5px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  background: transparent;
+  color: #b2bec3;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.mode-tab.active {
+  background: #0984e3;
+  border-color: #0984e3;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── Number inputs (SmartSearchForm) ─────────────── */
+.form-group input[type='number'] {
+  padding: 7px 11px;
+  border: 1px solid #dfe6e9;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+  background: #fff;
+}
+
+.form-group input[type='number']:focus {
+  border-color: #74b9ff;
+  box-shadow: 0 0 0 2px rgba(116, 185, 255, 0.2);
+}
+
+/* ── Itinerary list (right panel, smart mode) ────── */
+.itinerary-list {
+  width: 400px;
+  flex-shrink: 0;
+  background: #fff;
+  border-left: 1px solid #dfe6e9;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.itinerary-scroll {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── ItineraryCard ───────────────────────────────── */
+.itinerary-card {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0f2f5;
+  transition: background 0.1s;
+}
+
+.itinerary-card:hover {
+  background: #f8f9fa;
+}
+
+.itinerary-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.itinerary-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 20px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  padding: 0 5px;
+}
+
+.itinerary-route {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #2d3436;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itinerary-total {
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.itinerary-per-person {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: #636e72;
+}
+
+.itinerary-all-travelers {
+  font-size: 0.78rem;
+  color: #636e72;
+  margin-bottom: 6px;
+}
+
+/* Legs */
+.itinerary-legs {
+  list-style: none;
+  margin: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.itinerary-leg {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+
+.leg-airports {
+  font-weight: 600;
+  color: #2d3436;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.leg-price {
+  color: #0984e3;
+  font-weight: 700;
+  width: 36px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.leg-detail {
+  color: #636e72;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Days per stop */
+.itinerary-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.days-badge {
+  background: #f0f2f5;
+  color: #636e72;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+/* AI notes */
+.itinerary-notes {
+  font-size: 0.75rem;
+  color: #636e72;
+  font-style: italic;
+  margin-top: 6px;
+  margin-bottom: 0;
+  line-height: 1.4;
+  border-left: 2px solid #dfe6e9;
+  padding-left: 8px;
+}

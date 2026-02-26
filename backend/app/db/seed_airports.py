@@ -89,15 +89,15 @@ async def seed() -> None:
     print(f"Trovati {len(rows)} aeroporti europei. Inserimento nel DB...")
 
     async with async_session_maker() as session:
-        stmt = (
-            insert(Airport)
-            .values(rows)
-            .on_conflict_do_nothing(index_elements=["iata_code"])
+        stmt = insert(Airport).values(rows)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["iata_code"],
+            set_={"continent": stmt.excluded.continent},
         )
         await session.execute(stmt)
         await session.commit()
 
-    print(f"Seed completato: {len(rows)} aeroporti inseriti (duplicati ignorati).")
+    print(f"Seed completato: {len(rows)} aeroporti aggiornati/inseriti.")
 
 
 if __name__ == "__main__":
