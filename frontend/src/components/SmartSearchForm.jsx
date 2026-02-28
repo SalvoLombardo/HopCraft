@@ -12,22 +12,23 @@ function addDays(dateStr, n) {
 
 export default function SmartSearchForm({ airports, onSearch, loading }) {
   const [origin, setOrigin] = useState('')
-  const [tripDays, setTripDays] = useState(12)
   const [budget, setBudget] = useState(300)
   const [travelers, setTravelers] = useState(1)
   const [dateFrom, setDateFrom] = useState(() => addDays(todayStr(), 30))
-  const [dateTo, setDateTo] = useState(() => addDays(todayStr(), 60))
+  const [dateTo, setDateTo] = useState(() => addDays(todayStr(), 42))
   const [directOnly, setDirectOnly] = useState(false)
 
   const handleDateFromChange = (val) => {
     setDateFrom(val)
-    if (dateTo <= val) setDateTo(addDays(val, tripDays))
+    if (dateTo <= val) setDateTo(addDays(val, 12))
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
     const orig = origin.trim().toUpperCase()
     if (orig.length !== 3) return
+    const tripDays = Math.round((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24))
+    if (tripDays < 5 || tripDays > 25) return
     onSearch({ origin: orig, tripDurationDays: tripDays, budgetPerPerson: budget, travelers, dateFrom, dateTo, directOnly })
   }
 
@@ -52,20 +53,6 @@ export default function SmartSearchForm({ airports, onSearch, loading }) {
             </option>
           ))}
         </datalist>
-      </div>
-
-      <div className="form-group">
-        <label htmlFor="trip-days">Durata (gg)</label>
-        <input
-          id="trip-days"
-          type="number"
-          value={tripDays}
-          min={5}
-          max={25}
-          onChange={(e) => setTripDays(Number(e.target.value))}
-          required
-          style={{ width: 65 }}
-        />
       </div>
 
       <div className="form-group">
