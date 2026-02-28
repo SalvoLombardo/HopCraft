@@ -22,14 +22,11 @@ from app.services.providers.base import FlightOffer
 
 
 def _cutoff() -> datetime:
-    """I'm using this to set the cutoff separately and having this allow to verify 
-    if the FlightCache.fetched_at(see below async def get_cached ) is later of our cutoff 
+    """I'm using this to set the cutoff separately and having this allow to verify
+    if the FlightCache.fetched_at(see below async def get_cached ) is later of our cutoff
     In this way if FlightCache.fetched_at >= _cutoff() it will means that the data is still valueable and usable
     """
     return (datetime.now(timezone.utc) - timedelta(hours=settings.cache_ttl_hours)).replace(tzinfo=None)
-
-
-
 
 
 ########################################################################
@@ -59,7 +56,6 @@ async def get_cached(
 
     if row is None:
         return None
-    
 
     offers = []
     data = row.raw_response or []
@@ -68,11 +64,7 @@ async def get_cached(
         offers.append(offer)
     #Convert cached DICTs back to FlightOffer obj
 
-
-
     return offers, row.fetched_at
-
-
 
 
 ########################################################################

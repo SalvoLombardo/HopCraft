@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.airport import Airport
 from app.models.flight_cache import FlightCache
-from app.services.cache import save_to_cache
+from app.db.cache import save_to_cache
 from app.services.providers.base import FlightOffer
 from app.services.providers.factory import get_flight_provider
 from app.utils.geo import haversine_km
