@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint — ruff (pyflakes + pycodestyle, ignora lunghezza riga)
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install "ruff>=0.9.0"
+
+      - name: Run ruff
+        run: ruff check --select E,F --line-length 100 backend/app backend/tests
+
+  # ---------------------------------------------------------------------------
+  # Test — pytest (tutte le dipendenze esterne sono mockate, nessun servizio reale)
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    env:
+      # Valori dummy — i test mockano DB e Redis, le chiavi API non vengono usate
+      DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/hopcraft
+      DB_PASSWORD: test
+      REDIS_URL: redis://localhost:6379/0
+      FLIGHT_PROVIDER: amadeus
+      LLM_PROVIDER: gemini
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run pytest
+        working-directory: backend
+        run: pytest tests/ -v
+
+  # ---------------------------------------------------------------------------
+  # Deploy — da configurare nel punto 3.5 (decidere tra AWS ECS e EC2)
+  # ---------------------------------------------------------------------------
+  # deploy:
+  #   name: Deploy (AWS)
+  #   runs-on: ubuntu-latest
+  #   needs: test
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-region: ${{ secrets.AWS_REGION }}
+  #
+  #     # --- Opzione A: ECS ---
+  #     # - name: Login to Amazon ECR
+  #     #   uses: aws-actions/amazon-ecr-login@v2
+  #     # - name: Build & push Docker image
+  #     #   run: |
+  #     #     docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA backend/
+  #     #     docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
+  #     # - name: Deploy to ECS
+  #     #   uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+  #     #   with:
+  #     #     task-definition: .aws/task-definition.json
+  #     #     service: hopcraft-backend
+  #     #     cluster: hopcraft
+  #     #     wait-for-service-stability: true
+  #
+  #     # --- Opzione B: EC2 via SSH ---
+  #     # - name: Deploy via SSH
+  #     #   uses: appleboy/ssh-action@v1
+  #     #   with:
+  #     #     host: ${{ secrets.EC2_HOST }}
+  #     #     username: ec2-user
+  #     #     key: ${{ secrets.EC2_SSH_KEY }}
+  #     #     script: |
+  #     #       cd /opt/hopcraft
+  #     #       git pull origin main
+  #     #       docker compose up -d --build
