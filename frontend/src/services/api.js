@@ -28,38 +28,56 @@ export async function searchReverse({ destination, dateFrom, dateTo, directOnly,
     max_results: String(maxResults),
   })
 
-  const res = await fetch(`${BASE}/search/reverse?${params}`)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 45_000)
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(body.detail || `Errore ${res.status}`)
+  try {
+    const res = await fetch(`${BASE}/search/reverse?${params}`, { signal: controller.signal })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(body.detail || `Errore ${res.status}`)
+    }
+    return res.json()
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Ricerca troppo lenta, riprova tra qualche minuto.')
+    throw err
+  } finally {
+    clearTimeout(timer)
   }
-
-  return res.json()
 }
 
 /**
  * Smart Multi-City: propone itinerari multi-città ottimizzati via AI.
  */
 export async function searchSmartMulti({ origin, tripDurationDays, budgetPerPerson, travelers, dateFrom, dateTo, directOnly }) {
-  const res = await fetch(`${BASE}/search/smart-multi`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      origin,
-      trip_duration_days: tripDurationDays,
-      budget_per_person_eur: budgetPerPerson,
-      travelers,
-      date_from: dateFrom,
-      date_to: dateTo,
-      direct_only: directOnly,
-    }),
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 120_000)
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(body.detail || `Errore ${res.status}`)
+  try {
+    const res = await fetch(`${BASE}/search/smart-multi`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origin,
+        trip_duration_days: tripDurationDays,
+        budget_per_person_eur: budgetPerPerson,
+        travelers,
+        date_from: dateFrom,
+        date_to: dateTo,
+        direct_only: directOnly,
+      }),
+      signal: controller.signal,
+    })
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(body.detail || `Errore ${res.status}`)
+    }
+    return res.json()
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Ricerca troppo lenta, riprova tra qualche minuto.')
+    throw err
+  } finally {
+    clearTimeout(timer)
   }
-
-  return res.json()
 }

@@ -13,6 +13,7 @@ attivo (es. "amadeus:monthly") per evitare conflitti se si switcha provider.
 Amadeus free tier: 2.000 req/mese → limite impostato a 1.800 (10% di margine).
 """
 import asyncio
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -26,6 +27,8 @@ from app.services.providers.base import FlightOffer
 from app.services.providers.factory import get_flight_provider
 from app.utils.geo import haversine_km
 from app.utils.rate_limiter import check_rate_limit
+
+logger = logging.getLogger(__name__)
 
 # Nuove chiamate al provider massime per singola ricerca
 # Con Amadeus (2000 req/mese) possiamo permetterci batch più grandi.
@@ -140,8 +143,8 @@ async def reverse_search(
                 if day_offers:
                     await save_to_cache(session, origin, destination, single_date, day_offers)
             fresh_best[origin] = min(offers, key=lambda o: o.price_eur)#best price 
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Provider %s→%s fallito: %s: %s", origin, destination, type(exc).__name__, exc)
 
     await asyncio.gather(*[_fetch(o) for o in missing_origins])
 

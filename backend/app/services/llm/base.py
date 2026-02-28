@@ -5,9 +5,12 @@ Il prompt è definito qui una sola volta: tutti i provider lo ricevono identico,
 garantendo output coerente indipendentemente dal modello usato.
 """
 import json
+import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -106,16 +109,19 @@ def parse_itineraries(raw: str) -> list[SuggestedItinerary]:
     match = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
     cleaned = match.group(1).strip() if match else raw.strip()
 
-    data = json.loads(cleaned)
-
-    result: list[SuggestedItinerary] = []
-    for item in data:
-        result.append(
-            SuggestedItinerary(
-                route=item["route"],
-                reasoning=item.get("reasoning", ""),
-                estimated_difficulty=item.get("estimated_difficulty", "medium"),
-                best_season=item.get("best_season", []),
+    try:
+        data = json.loads(cleaned)
+        result: list[SuggestedItinerary] = []
+        for item in data:
+            result.append(
+                SuggestedItinerary(
+                    route=item["route"],
+                    reasoning=item.get("reasoning", ""),
+                    estimated_difficulty=item.get("estimated_difficulty", "medium"),
+                    best_season=item.get("best_season", []),
+                )
             )
-        )
-    return result
+        return result
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        logger.warning("parse_itineraries fallito: %s. Raw (500 chars): %.500s", exc, raw)
+        raise ValueError(f"Risposta LLM non valida: {exc}") from exc

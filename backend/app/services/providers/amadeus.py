@@ -129,14 +129,23 @@ class AmadeusProvider(FlightProvider):
             params["nonStop"] = "true"
 
         for attempt in range(3):
-            async with httpx.AsyncClient(timeout=30) as client:
-                token = await self._get_token(client)
-                resp = await client.get(
-                    _SEARCH_URL,
-                    params=params,
-                    headers={"Authorization": f"Bearer {token}"},
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    token = await self._get_token(client)
+                    resp = await client.get(
+                        _SEARCH_URL,
+                        params=params,
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+                # client chiuso qui — resp.json() resta accessibile (body già letto da httpx)
+            except httpx.TimeoutException:
+                logger.warning(
+                    "Amadeus %s→%s %s: timeout (tentativo %d/3)",
+                    origin, destination, date_from, attempt + 1,
                 )
-            # client chiuso qui — resp.json() resta accessibile (body già letto da httpx)
+                if attempt == 2:
+                    return []
+                continue
 
             if resp.status_code == 429:
                 wait = 2 ** attempt  # 1s, 2s, 4s
