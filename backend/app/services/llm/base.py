@@ -29,6 +29,7 @@ class LLMProvider(ABC):
         season: str,
         num_stops: int,
         available_airports: list[str],
+        provider_hint: str = "",
     ) -> list[SuggestedItinerary]:
         """
         Genera itinerari multi-città candidati.
@@ -78,9 +79,10 @@ def build_user_prompt(
     season: str,
     num_stops: int,
     available_airports: list[str],
+    provider_hint: str = "",
 ) -> str:
     airport_list = ", ".join(available_airports)
-    return (
+    prompt = (
         f"Origine: {origin}\n"
         f"Durata viaggio: {duration_days} giorni\n"
         f"Budget per tratta per persona: {budget_per_leg}€\n"
@@ -88,6 +90,9 @@ def build_user_prompt(
         f"Numero tappe intermedie: {num_stops}\n"
         f"Aeroporti disponibili nel raggio: {airport_list}"
     )
+    if provider_hint:
+        prompt += f"\nVincolo provider: {provider_hint}"
+    return prompt
 
 
 def parse_itineraries(raw: str) -> list[SuggestedItinerary]:

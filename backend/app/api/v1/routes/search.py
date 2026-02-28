@@ -119,10 +119,4 @@ async def search_smart_multi(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
-    if not result.itineraries:
-        raise HTTPException(
-            status_code=404,
-            detail="Nessun itinerario trovato nel budget indicato. Prova ad aumentare il budget o la durata.",
-        )
-
     return result

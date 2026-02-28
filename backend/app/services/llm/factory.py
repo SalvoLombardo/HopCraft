@@ -8,11 +8,15 @@ la factory tenta automaticamente il successivo nell'ordine fino ad esaurirli.
 Il codice applicativo chiama solo generate_with_fallback() — non sa quale
 provider sta usando (Strategy Pattern).
 """
+import logging
+
 from app.config import settings
 from app.services.llm.base import SuggestedItinerary
 from app.services.llm.gemini import GeminiProvider
 from app.services.llm.groq import GroqProvider
 from app.services.llm.mistral import MistralProvider
+
+logger = logging.getLogger(__name__)
 
 _PROVIDERS = {
     "gemini":  lambda: GeminiProvider(api_key=settings.gemini_api_key),
@@ -30,9 +34,14 @@ async def generate_with_fallback(
     season: str,
     num_stops: int,
     available_airports: list[str],
+    provider_hint: str = "",
 ) -> list[SuggestedItinerary]:
     """
     Tenta il provider configurato in LLM_PROVIDER; in caso di errore scala ai fallback.
+
+    Args:
+        provider_hint: vincolo opzionale per il prompt (es. restrizioni del flight provider attivo).
+                       Stringa vuota = nessun vincolo aggiuntivo.
 
     Raises:
         RuntimeError: se tutti i provider falliscono.
@@ -49,8 +58,10 @@ async def generate_with_fallback(
                 season=season,
                 num_stops=num_stops,
                 available_airports=available_airports,
+                provider_hint=provider_hint,
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("LLM provider '%s' fallito: %s: %s", name, type(exc).__name__, exc)
             continue
 
     raise RuntimeError("Tutti i provider LLM hanno fallito.")

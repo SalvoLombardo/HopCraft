@@ -32,9 +32,11 @@ class GeminiProvider(LLMProvider):
         season: str,
         num_stops: int,
         available_airports: list[str],
+        provider_hint: str = "",
     ) -> list[SuggestedItinerary]:
         user_prompt = build_user_prompt(
-            origin, duration_days, budget_per_leg, season, num_stops, available_airports
+            origin, duration_days, budget_per_leg, season, num_stops, available_airports,
+            provider_hint=provider_hint,
         )
 
         payload = {

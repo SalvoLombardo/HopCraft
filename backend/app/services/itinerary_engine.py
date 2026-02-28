@@ -13,6 +13,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.schemas import ItineraryOut, LegOut, SmartMultiOut
 from app.services.area_calculator import AreaResult, calculate_area
 from app.services.llm.base import SuggestedItinerary
@@ -20,12 +21,27 @@ from app.services.llm.factory import generate_with_fallback
 from app.services.providers.base import FlightOffer, Leg
 from app.services.providers.factory import get_flight_provider
 
+# Hint iniettato nel prompt LLM quando il provider voli è Amadeus.
+# Amadeus free tier non copre le low-cost europee (Ryanair, easyJet, Wizz Air):
+# serve guidare l'AI verso aeroporti principali coperti dalle major carriers.
+# Quando si switcha a google_flights (che copre tutte le compagnie), il hint è "".
+_AMADEUS_PROVIDER_HINT = (
+    "Il provider di voli attivo copre solo major carriers (Air France, Lufthansa, "
+    "Iberia, BA, KLM, ITA, SAS, TAP, Finnair). Usa ESCLUSIVAMENTE aeroporti principali: "
+    "CDG/ORY per Parigi, FCO per Roma, LHR/LGW per Londra, MXP/LIN per Milano, "
+    "AMS per Amsterdam, BRU per Bruxelles, MAD per Madrid, BCN per Barcellona, "
+    "FRA per Francoforte, MUC per Monaco, VIE per Vienna, ZRH per Zurigo. "
+    "Evita aeroporti secondari: BGY, CIA, STN, BVA, CRL, HHN, EIN, MST, SXB, GDN."
+)
+
 # Limite aeroporti inviati all'LLM (i più vicini, già ordinati per distanza).
 # Evita token overflow con liste molto grandi.
 _MAX_AIRPORTS_FOR_LLM = 100
 
 # Massimo task di pricing eseguiti in contemporanea (tutela rate limit API voli).
-_MAX_CONCURRENT_PRICING = 5
+# Amadeus test API tollera ~10 req/sec; con 3 itinerari in parallelo e retry su 429
+# si rimane ampiamente sotto quel limite senza penalizzare eccessivamente i tempi.
+_MAX_CONCURRENT_PRICING = 3
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +193,10 @@ async def run_smart_multi(
     # Limiting airports for _MAX_AIRPORTS_FOR_LLM (exclude token overflow) the airports are already ordered by 'calculate_area()'
     airports_for_llm = explorable_area_details.airports[:_MAX_AIRPORTS_FOR_LLM]
     available_airports = [f"{a.iata_code} ({a.city})" for a in airports_for_llm]
+    # Vincolo provider-specifico: Amadeus copre solo major carriers → guida l'AI
+    # verso aeroporti principali. Con google_flights (copre tutte le compagnie) hint="".
+    provider_hint = _AMADEUS_PROVIDER_HINT if settings.flight_provider == "amadeus" else ""
+
     #Routing here Calling the orchestrator - generate_itineraries - build_prompt - parsing - returning 'list[SuggestedItinerary]objs'
     suggestions: list[SuggestedItinerary] = await generate_with_fallback(
         origin=origin,
@@ -185,6 +205,7 @@ async def run_smart_multi(
         season=season,
         num_stops=explorable_area_details.num_stops,
         available_airports=available_airports,
+        provider_hint=provider_hint,
     )
 
     # ── Step 3: verifica prezzi reali (parallelo, con limite concorrenza) ───
@@ -196,19 +217,51 @@ async def run_smart_multi(
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     # ── Step 4: filtraggio per budget + ranking ──────────────────────────────
+    # Conta le cause di scarto per fornire messaggi di errore precisi.
+    n_no_data = 0      # tratte senza voli dal provider (gap copertura)
+    n_over_budget = 0  # itinerari completi ma oltre il budget
+
     priced: list[tuple[SuggestedItinerary, list[FlightOffer], float]] = []
     for res in results:
-        # Scarta eccezioni (timeout, errori provider) e itinerari incompleti (None)
-        if not isinstance(res, tuple):
+        # None = itinerario incompleto (una o più tratte senza voli disponibili)
+        # Exception = errore provider su quell'itinerario
+        if res is None or isinstance(res, Exception):
+            n_no_data += 1
             continue
         suggested, offers = res
         total_per_person = sum(o.price_eur for o in offers)
         if total_per_person > budget_per_person_eur:
+            n_over_budget += 1
             continue
         priced.append((suggested, offers, total_per_person))
 
     priced.sort(key=lambda x: x[2])  # prezzo totale per persona, crescente
     top5 = priced[:5]
+
+    if not top5:
+        if n_no_data > 0 and n_over_budget == 0:
+            raise ValueError(
+                f"Il provider non ha trovato voli per le rotte suggerite dall'AI "
+                f"({n_no_data} itinerari senza copertura). "
+                "Prova con date diverse, un'origine con più connessioni, o cambia il provider voli."
+            )
+        if n_over_budget > 0 and n_no_data == 0:
+            raise ValueError(
+                f"Trovati {n_over_budget} itinerari ma tutti oltre il budget di "
+                f"€{budget_per_person_eur:.0f}/persona. "
+                "Prova ad aumentare il budget o la durata del viaggio."
+            )
+        if n_no_data > 0 and n_over_budget > 0:
+            raise ValueError(
+                f"Nessun itinerario valido: {n_no_data} senza copertura voli, "
+                f"{n_over_budget} oltre il budget di €{budget_per_person_eur:.0f}/persona. "
+                "Prova con date diverse o aumenta il budget."
+            )
+        # Nessun itinerario generato dall'AI o tutti con rotta invalida
+        raise ValueError(
+            "L'AI non ha generato itinerari validi per i parametri forniti. "
+            "Prova con un'origine diversa o date diverse."
+        )
 
     # ── Step 5: costruzione risposta ────────────────────────────────────────
     itineraries: list[ItineraryOut] = []
