@@ -1,6 +1,6 @@
-"""
-Router v1 — aggrega tutte le route dell'API v1.
-"""
+#To aggregate all routes for API1
+
+
 from fastapi import APIRouter
 
 from app.api.v1.routes.search import router as search_router

@@ -1,18 +1,11 @@
-"""
-Utility geografiche — formula Haversine e calcoli raggio/tappe.
-
-Usate da:
-  - Endpoint /airports/in-radius (1.9)
-  - Area calculator per Smart Multi-City (2.1)
-"""
 import math
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
-    Calcola la distanza in km tra due coordinate geografiche (formula Haversine).
+    To get distnce from 2 coordinates in km C(Haversineformula).
     """
-    R = 6371.0  # raggio terrestre in km
+    R = 6371.0  # heart radius in km 
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
     a = (
@@ -26,9 +19,12 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def estimate_radius_km(trip_duration_days: int) -> int:
     """
-    Stima il raggio esplorabile in km dalla durata del viaggio.
-    Logica: più giorni = raggio più ampio, ma con rendimenti decrescenti.
-    Usata nello Step 1 della pipeline Smart Multi-City.
+    To eximate the explorable radius based on trip duration 
+    I decide to use the concept of diminishing retuns
+    It's based on 3 solution:
+    -Short trip - under 7 days (every day value 200km)
+    -Medium trip - between 8 and 15 days (every day value 150km)
+    -Long trip - over 15 day (every day value 100KM )
     """
     if trip_duration_days <= 7:
         radius = trip_duration_days * 200
@@ -41,7 +37,7 @@ def estimate_radius_km(trip_duration_days: int) -> int:
 
 
 def estimate_stops(trip_duration_days: int) -> int:
-    """Numero di tappe intermedie suggerite in base alla durata del viaggio."""
+    """To get intermediate airport stops you will can do."""
     if trip_duration_days <= 7:
         return min(2, trip_duration_days // 3)
     elif trip_duration_days <= 15:

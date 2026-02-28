@@ -1,16 +1,3 @@
-"""
-Endpoint Reverse Search.
-
-GET /api/v1/search/reverse
-  ?destination=CTA
-  &date_from=2026-04-01
-  &date_to=2026-04-03
-  &direct_only=false
-  &max_results=50
-  &origin_lat=52.3     (opzionale — con origin_lon e radius_km restringe la ricerca per area)
-  &origin_lon=4.9
-  &radius_km=600
-"""
 from datetime import date, datetime
 from typing import Annotated
 
@@ -27,6 +14,22 @@ router = APIRouter()
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
+
+
+
+"""
+Endpoint Reverse Search.-----------------------------------------------------------------------------------
+
+GET /api/v1/search/reverse
+  ?destination=CTA
+  &date_from=2026-04-01
+  &date_to=2026-04-03
+  &direct_only=false
+  &max_results=50
+  &origin_lat=52.3     
+  &origin_lon=4.9
+  &radius_km=600
+"""
 @router.get("/reverse", response_model=ReverseSearchOut)
 async def search_reverse(
     session: SessionDep,
@@ -39,12 +42,16 @@ async def search_reverse(
     origin_lon: Annotated[float | None, Query(ge=-180, le=180, description="Longitudine area di partenza")] = None,
     radius_km: Annotated[int | None, Query(ge=50, le=5000, description="Raggio in km dall'area di partenza")] = None,
 ) -> ReverseSearchOut:
+    
+    #Validation area -------------------------------------------
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from deve essere <= date_to")
     if (date_to - date_from).days > 6:
         raise HTTPException(status_code=422, detail="Il range massimo è 7 giorni")
     if (origin_lat is None) != (origin_lon is None):
         raise HTTPException(status_code=422, detail="origin_lat e origin_lon devono essere forniti insieme")
+    #Validation area -------------------------------------------
+
 
     results, cached, fetched_at = await reverse_search(
         session=session,
@@ -93,7 +100,7 @@ async def search_smart_multi(
     Smart Multi-City: dato origine, durata, budget e date restituisce
     i top 5 itinerari multi-città ottimizzati con prezzi reali.
     """
-    # Validazioni di business
+    #Validation area -------------------------------------------
     if body.trip_duration_days < 5 or body.trip_duration_days > 25:
         raise HTTPException(status_code=422, detail="trip_duration_days deve essere tra 5 e 25")
     if body.budget_per_person_eur <= 0:
@@ -102,6 +109,10 @@ async def search_smart_multi(
         raise HTTPException(status_code=422, detail="travelers deve essere almeno 1")
     if body.date_from >= body.date_to:
         raise HTTPException(status_code=422, detail="date_from deve essere < date_to")
+    #Validation area -------------------------------------------
+
+
+
 
     try:
         result = await run_smart_multi(

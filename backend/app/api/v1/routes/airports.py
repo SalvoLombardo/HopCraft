@@ -26,7 +26,7 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 @router.get("", response_model=list[AirportOut])
 async def list_airports(session: SessionDep) -> list[AirportOut]:
-    """Restituisce tutti gli aeroporti attivi."""
+    """To get all airports"""
     result = await session.execute(
         select(Airport).where(Airport.is_active.is_(True)).order_by(Airport.iata_code)
     )
@@ -41,8 +41,8 @@ async def airports_in_radius(
     radius_km: Annotated[int, Query(ge=1, le=10000, description="Raggio in km")] = 2000,
 ) -> list[AirportNearbyOut]:
     """
-    Aeroporti attivi entro radius_km dal punto (lat, lon), ordinati per distanza crescente.
-    Usato dalla pipeline Smart Multi-City per trovare destinazioni raggiungibili.
+    To get active airports from a starting point to a certain radius (lat, lon) order by distance ASC
+    Used by Smart Multi-City to obtain reacheble destination
     """
     result = await session.execute(
         select(Airport).where(Airport.is_active.is_(True))
