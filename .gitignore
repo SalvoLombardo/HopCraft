@@ -141,7 +141,3 @@ temp/
 CHECKLIST.md 
 Structure.md
 
-
-#temporary
-infra/
-.env.prod.example
