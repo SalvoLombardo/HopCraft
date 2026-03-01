@@ -41,6 +41,18 @@ class FlightOfferOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Provider status — incluso in ogni risposta di ricerca voli
+# Mostra quale provider è attivo e quante richieste rimangono per ognuno.
+# ---------------------------------------------------------------------------
+
+class ProviderStatus(BaseModel):
+    active_provider: str    # "serpapi" | "amadeus" | "none"
+    serpapi_remaining: int
+    amadeus_remaining: int
+    note: str               # messaggio human-readable per il badge frontend
+
+
+# ---------------------------------------------------------------------------
 # reverse search answer
 # ---------------------------------------------------------------------------
 
@@ -49,6 +61,7 @@ class ReverseSearchOut(BaseModel):
     results: list[FlightOfferOut]
     cached: bool
     fetched_at: datetime
+    provider_status: ProviderStatus | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -88,3 +101,4 @@ class SmartMultiIn(BaseModel):
 class SmartMultiOut(BaseModel):
     origin: str
     itineraries: list[ItineraryOut]
+    provider_status: ProviderStatus | None = None

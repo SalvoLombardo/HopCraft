@@ -2,10 +2,11 @@
 Test per il modulo search_engine: _build_result (puro) e reverse_search (mock).
 
 Tutte le dipendenze esterne vengono sostituite con mock:
-  - AsyncSession  → side_effect che alterna risposta airports / cache
-  - get_flight_provider → provider fittizio che restituisce offerte controllate
-  - check_rate_limit   → restituisce True per default (limite non raggiunto)
-  - save_to_cache      → AsyncMock silenzioso
+  - AsyncSession        → side_effect che alterna risposta airports / cache
+  - get_providers_in_order → lista con un provider fittizio
+  - get_provider_quotas    → saldi fissi
+  - check_rate_limit    → restituisce True per default (limite non raggiunto)
+  - save_to_cache       → AsyncMock silenzioso
 """
 from dataclasses import asdict
 from datetime import date, datetime, timezone
@@ -15,6 +16,9 @@ import pytest
 
 from app.services.providers.base import FlightOffer
 from app.services.search_engine import _build_result, reverse_search
+
+# Quota fittizia restituita da get_provider_quotas nei test
+_FAKE_QUOTAS = {"serpapi": 200, "amadeus": 1800}
 
 
 # ---------------------------------------------------------------------------
@@ -119,11 +123,14 @@ class TestReverseSearch:
         session = _build_session([fco_airport], [cache_entry])
         mock_provider = AsyncMock()
 
-        with patch("app.services.search_engine.get_flight_provider", return_value=mock_provider), \
+        with patch("app.services.search_engine.get_providers_in_order",
+                   new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
+             patch("app.services.search_engine.get_provider_quotas",
+                   new=AsyncMock(return_value=_FAKE_QUOTAS)), \
              patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
-            results, all_from_cache, _ = await reverse_search(
+            results, all_from_cache, _, status = await reverse_search(
                 session=session,
                 destination=DESTINATION,
                 date_from=DATE_FROM,
@@ -133,6 +140,8 @@ class TestReverseSearch:
         assert all_from_cache is True
         assert len(results) == 1
         assert results[0]["origin"] == "FCO"
+        assert status is not None
+        assert status.serpapi_remaining == 200
         mock_provider.search_one_way.assert_not_called()
 
     async def test_no_cache_provider_returns_offers(self):
@@ -145,11 +154,14 @@ class TestReverseSearch:
         mock_provider = AsyncMock()
         mock_provider.search_one_way = AsyncMock(return_value=[offer])
 
-        with patch("app.services.search_engine.get_flight_provider", return_value=mock_provider), \
+        with patch("app.services.search_engine.get_providers_in_order",
+                   new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
+             patch("app.services.search_engine.get_provider_quotas",
+                   new=AsyncMock(return_value=_FAKE_QUOTAS)), \
              patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
-            results, all_from_cache, _ = await reverse_search(
+            results, all_from_cache, _, _ = await reverse_search(
                 session=session,
                 destination=DESTINATION,
                 date_from=DATE_FROM,
@@ -161,17 +173,20 @@ class TestReverseSearch:
         assert results[0]["price_eur"] == 35.00
 
     async def test_rate_limit_exhausted_returns_empty(self):
-        """Se il rate limit è esaurito, nessuna chiamata al provider → lista vuota."""
+        """Se il rate limit è esaurito per tutti i provider, nessuna chiamata → lista vuota."""
         fco_airport = _make_airport("FCO", "Rome", 41.80, 12.24)
 
         session = _build_session([fco_airport], [])
         mock_provider = AsyncMock()
 
-        with patch("app.services.search_engine.get_flight_provider", return_value=mock_provider), \
+        with patch("app.services.search_engine.get_providers_in_order",
+                   new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
+             patch("app.services.search_engine.get_provider_quotas",
+                   new=AsyncMock(return_value=_FAKE_QUOTAS)), \
              patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=False)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
-            results, all_from_cache, _ = await reverse_search(
+            results, all_from_cache, _, _ = await reverse_search(
                 session=session,
                 destination=DESTINATION,
                 date_from=DATE_FROM,
@@ -196,12 +211,15 @@ class TestReverseSearch:
         mock_provider = AsyncMock()
         mock_provider.search_one_way = AsyncMock(side_effect=Exception("Connection error"))
 
-        with patch("app.services.search_engine.get_flight_provider", return_value=mock_provider), \
+        with patch("app.services.search_engine.get_providers_in_order",
+                   new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
+             patch("app.services.search_engine.get_provider_quotas",
+                   new=AsyncMock(return_value=_FAKE_QUOTAS)), \
              patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()), \
              caplog.at_level(logging.WARNING, logger="app.services.search_engine"):
 
-            results, _, _ = await reverse_search(
+            results, _, _, _ = await reverse_search(
                 session=session,
                 destination=DESTINATION,
                 date_from=DATE_FROM,
@@ -232,11 +250,14 @@ class TestReverseSearch:
 
         session = _build_session(airports, cache_entries)
 
-        with patch("app.services.search_engine.get_flight_provider"), \
+        with patch("app.services.search_engine.get_providers_in_order",
+                   new=AsyncMock(return_value=[])), \
+             patch("app.services.search_engine.get_provider_quotas",
+                   new=AsyncMock(return_value=_FAKE_QUOTAS)), \
              patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
-            results, _, _ = await reverse_search(
+            results, _, _, _ = await reverse_search(
                 session=session,
                 destination=DESTINATION,
                 date_from=DATE_FROM,
@@ -248,8 +269,6 @@ class TestReverseSearch:
 
     async def test_geographic_filter_limits_airports(self):
         """Con filtro raggio, solo gli aeroporti entro il raggio vengono interrogati."""
-        # FCO (Roma, ~900km da CTA) → dentro un raggio di 1000 km
-        # BER (Berlino, ~2000km da CTA) → fuori
         fco_airport = _make_airport("FCO", "Rome", 41.80, 12.24)
         ber_airport = _make_airport("BER", "Berlin", 52.37, 13.50)
 
@@ -264,7 +283,10 @@ class TestReverseSearch:
         mock_provider = AsyncMock()
         mock_provider.search_one_way = fake_search_one_way
 
-        with patch("app.services.search_engine.get_flight_provider", return_value=mock_provider), \
+        with patch("app.services.search_engine.get_providers_in_order",
+                   new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
+             patch("app.services.search_engine.get_provider_quotas",
+                   new=AsyncMock(return_value=_FAKE_QUOTAS)), \
              patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
@@ -273,7 +295,7 @@ class TestReverseSearch:
                 destination=DESTINATION,
                 date_from=DATE_FROM,
                 date_to=DATE_TO,
-                origin_lat=37.47,   # CTA
+                origin_lat=37.47,
                 origin_lon=15.06,
                 radius_km=1000,
             )

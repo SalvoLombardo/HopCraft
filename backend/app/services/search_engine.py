@@ -4,13 +4,15 @@ Core logic per la Reverse Search.
 Flusso:
   1. Query efficiente in batch: trova tutte le cache entries valide per
      (qualsiasi_origine → destination) nelle date richieste.
-  2. Per gli aeroporti senza cache, chiama il provider (max _MAX_NEW_CALLS_PER_SEARCH).
+  2. Per gli aeroporti senza cache, chiama i provider in ordine cascade
+     (SerpAPI → Amadeus) fino al primo che risponde con risultati.
+     Massimo _MAX_NEW_CALLS_PER_SEARCH aeroporti per ricerca.
   3. Salva i nuovi risultati in cache.
-  4. Restituisce lista arricchita con coordinate aeroporto + metadati.
+  4. Restituisce lista arricchita con coordinate aeroporto + metadati provider.
 
-Rate limit mensile gestito via Redis: la chiave cambia in base al provider
-attivo (es. "amadeus:monthly") per evitare conflitti se si switcha provider.
-Amadeus free tier: 2.000 req/mese → limite impostato a 1.800 (10% di margine).
+Rate limit mensile gestito via Redis: chiave separata per provider
+(serpapi:monthly, amadeus:monthly). I limiti e la finestra
+temporale sono centralizzati in providers/factory.py (PROVIDER_LIMITS, MONTHLY_WINDOW).
 """
 import asyncio
 import logging
@@ -19,29 +21,31 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
+from app.config import settings  # noqa: F401 — tenuto per compatibilità import esistenti
 from app.models.airport import Airport
 from app.models.flight_cache import FlightCache
 from app.db.cache import save_to_cache
+from app.models.schemas import ProviderStatus
 from app.services.providers.base import FlightOffer
-from app.services.providers.factory import get_flight_provider
+from app.services.providers.factory import (
+    MONTHLY_WINDOW,
+    PROVIDER_LIMITS,
+    PROVIDER_NOTES,
+    get_provider_quotas,
+    get_providers_in_order,
+)
 from app.utils.geo import haversine_km
 from app.utils.rate_limiter import check_rate_limit
 
 logger = logging.getLogger(__name__)
 
 # Nuove chiamate al provider massime per singola ricerca
-# Con Amadeus (2000 req/mese) possiamo permetterci batch più grandi.
 _MAX_NEW_CALLS_PER_SEARCH = 50
-# Limite mensile con margine di sicurezza (Amadeus: 2000 → 1800)
-_PROVIDER_MONTHLY_LIMIT = 1800
-_MONTHLY_WINDOW = 30 * 24 * 3600
 
 
 def _cache_cutoff() -> datetime:
-    # .replace(tzinfo=None): PostgreSQL TIMESTAMP WITHOUT TIME ZONE richiede datetime naive.
-    # Calcoliamo in UTC e poi strippiamo tzinfo prima di passarlo a asyncpg.
-    return (datetime.now(timezone.utc) - timedelta(hours=settings.cache_ttl_hours)).replace(tzinfo=None)
+    from app.config import settings as _s
+    return (datetime.now(timezone.utc) - timedelta(hours=_s.cache_ttl_hours)).replace(tzinfo=None)
 
 
 async def reverse_search(
@@ -54,18 +58,16 @@ async def reverse_search(
     origin_lat: float | None = None,
     origin_lon: float | None = None,
     radius_km: int | None = None,
-) -> tuple[list[dict], bool, datetime]:
+) -> tuple[list[dict], bool, datetime, ProviderStatus]:
     """
     Reverse search: trova i voli più economici verso destination da tutti gli aeroporti attivi.
 
     Parametri opzionali di filtraggio geografico:
-        origin_lat / origin_lon / radius_km — se forniti, restringe la ricerca agli aeroporti
-        entro radius_km dal punto indicato. Riduce drasticamente le chiamate al provider
-        quando l'utente sa già in quale area si trova (es. Europa del Nord).
+        origin_lat / origin_lon / radius_km — restringe la ricerca agli aeroporti
+        entro radius_km dal punto indicato.
 
     Returns:
-        (lista risultati, all_from_cache, fetched_at)
-        Ogni elemento della lista è un dict compatibile con FlightOfferOut.
+        (lista risultati, all_from_cache, fetched_at, provider_status)
     """
 
     # --- 1. Carica tutti gli aeroporti attivi (esclusa la destinazione stessa)
@@ -85,16 +87,14 @@ async def reverse_search(
             if haversine_km(origin_lat, origin_lon, airport.latitude, airport.longitude) <= radius_km
         }
 
-
-
-    # --- 2. Building 7days range 
+    # --- 2. Building 7days range
     date_list: list[date] = []
     current = date_from
     while current <= date_to and len(date_list) < 7:
         date_list.append(current)
         current += timedelta(days=1)
 
-    # --- 3. Checking in cache for (date_list), we are searching just the destination (not origin and destination)
+    # --- 3. Checking in cache for (date_list)
     stmt_cache = select(FlightCache).where(
         FlightCache.destination == destination,
         FlightCache.departure_date.in_(date_list),
@@ -102,7 +102,6 @@ async def reverse_search(
     )
     cache_rows = await session.execute(stmt_cache)
 
-    # Per ogni origine, tieni solo l'offerta più economica fra tutte le date in cache
     cache_best: dict[str, tuple[FlightOffer, datetime]] = {}
     for single_flight_cache_obj in cache_rows.scalars():
         offers = [FlightOffer(**item) for item in (single_flight_cache_obj.raw_response or [])]
@@ -113,42 +112,49 @@ async def reverse_search(
         if prev is None or cheapest.price_eur < prev[0].price_eur:
             cache_best[single_flight_cache_obj.origin] = (cheapest, single_flight_cache_obj.fetched_at)
 
-    # --- 4. Using 'set difference' to find wich origin airport is not in cache 
+    # --- 4. Missing origins
     all_origins = set(airport_map.keys())
     cached_origins = set(cache_best.keys())
-    missing_origins = list(all_origins - cached_origins)[:_MAX_NEW_CALLS_PER_SEARCH] #slicing until target
+    missing_origins = list(all_origins - cached_origins)[:_MAX_NEW_CALLS_PER_SEARCH]
 
-    # --- 5. Parallel fetch for missing origins (with rate limit) ---
-    provider = get_flight_provider()
+    # --- 5. Cascade provider setup
+    providers_in_order = await get_providers_in_order()
+    active_provider = providers_in_order[0][0] if providers_in_order else "none"
+
     fresh_best: dict[str, FlightOffer] = {}
 
     async def _fetch(origin: str) -> None:
-        rate_key = f"{settings.flight_provider}:monthly"
-        allowed = await check_rate_limit(rate_key, _PROVIDER_MONTHLY_LIMIT, _MONTHLY_WINDOW)
-        if not allowed:
-            return
-        try:
-            offers = await provider.search_one_way(
-                origin, destination, date_from, date_to,
-                direct_only=direct_only, max_results=10,
-            )
-            if not offers:
-                return
-            
-            
+        for provider_name, provider in providers_in_order:
+            rate_key = f"{provider_name}:monthly"
+            allowed = await check_rate_limit(rate_key, PROVIDER_LIMITS[provider_name], MONTHLY_WINDOW)
+            if not allowed:
+                continue
+            try:
+                offers = await provider.search_one_way(
+                    origin, destination, date_from, date_to,
+                    direct_only=direct_only, max_results=10,
+                )
+                if not offers:
+                    continue
 
-            #####Saving in cache but based on every single date
-            for single_date in date_list:
-                day_offers = [o for o in offers if o.departure.startswith(single_date.isoformat())]
-                if day_offers:
-                    await save_to_cache(session, origin, destination, single_date, day_offers)
-            fresh_best[origin] = min(offers, key=lambda o: o.price_eur)#best price 
-        except Exception as exc:
-            logger.warning("Provider %s→%s fallito: %s: %s", origin, destination, type(exc).__name__, exc)
+                # Salva in cache per data
+                for single_date in date_list:
+                    day_offers = [o for o in offers if o.departure.startswith(single_date.isoformat())]
+                    if day_offers:
+                        await save_to_cache(session, origin, destination, single_date, day_offers)
+                fresh_best[origin] = min(offers, key=lambda o: o.price_eur)
+                return  # provider ha risposto: non provare i successivi
+
+            except Exception as exc:
+                logger.warning(
+                    "Provider %s %s→%s fallito: %s: %s",
+                    provider_name, origin, destination, type(exc).__name__, exc,
+                )
+                continue  # prova il provider successivo
 
     await asyncio.gather(*[_fetch(o) for o in missing_origins])
 
-    # --- 6. Assembling the answer with airport coordinates 
+    # --- 6. Assembling the answer
     results: list[dict] = []
 
     for origin, (offer, fetched_at) in cache_best.items():
@@ -168,11 +174,19 @@ async def reverse_search(
     all_from_cache = len(fresh_best) == 0
     fetched_at = results[0]["_fetched_at"] if results else now
 
-    # Rimuove il campo interno _fetched_at prima di restituire
     for r in results:
         r.pop("_fetched_at")
 
-    return results, all_from_cache, fetched_at
+    # --- 7. Provider status
+    quotas = await get_provider_quotas()
+    provider_status = ProviderStatus(
+        active_provider=active_provider,
+        serpapi_remaining=quotas.get("serpapi", 0),
+        amadeus_remaining=quotas.get("amadeus", 0),
+        note=PROVIDER_NOTES.get(active_provider, ""),
+    )
+
+    return results, all_from_cache, fetched_at, provider_status
 
 
 def _build_result(offer: FlightOffer, airport: Airport, fetched_at: datetime) -> dict:
@@ -186,6 +200,5 @@ def _build_result(offer: FlightOffer, airport: Airport, fetched_at: datetime) ->
         "duration_minutes": offer.duration_minutes,
         "latitude": airport.latitude,
         "longitude": airport.longitude,
-        # Campo interno per estrarre fetched_at dal primo risultato
         "_fetched_at": fetched_at,
     }

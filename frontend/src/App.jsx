@@ -44,6 +44,35 @@ function SmartLoadingProgress() {
   )
 }
 
+// ── Provider Badge ────────────────────────────────────────────────────────────
+
+const PROVIDER_COLORS = {
+  serpapi: 'green',
+  ryanair: 'yellow',
+  amadeus: 'red',
+  none: 'red',
+}
+
+const PROVIDER_LABELS = {
+  serpapi: 'Google Flights (SerpAPI)',
+  ryanair: 'Ryanair only',
+  amadeus: 'Major carriers only (Amadeus)',
+  none: 'No provider available',
+}
+
+function ProviderBadge({ status }) {
+  if (!status) return null
+  const color = PROVIDER_COLORS[status.active_provider] || 'red'
+  const label = PROVIDER_LABELS[status.active_provider] || status.active_provider
+  return (
+    <div className={`provider-badge provider-badge--${color}`}>
+      <span className="provider-badge__dot" />
+      <span className="provider-badge__label">{label}</span>
+      <span className="provider-badge__note">{status.note}</span>
+    </div>
+  )
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -174,34 +203,40 @@ export default function App() {
 
         {/* ── Reverse results ────────────────────────────────────────────── */}
         {mode === 'reverse' && reverseResults && (
-          <div className="results-layout">
-            <Map results={reverseResults.results} destination={destination} />
-            <ResultsList
-              results={reverseResults.results}
-              cached={reverseResults.cached}
-              destination={destination}
-            />
-          </div>
+          <>
+            <ProviderBadge status={reverseResults.provider_status} />
+            <div className="results-layout">
+              <Map results={reverseResults.results} destination={destination} />
+              <ResultsList
+                results={reverseResults.results}
+                cached={reverseResults.cached}
+                destination={destination}
+              />
+            </div>
+          </>
         )}
 
         {/* ── Smart results ──────────────────────────────────────────────── */}
         {mode === 'smart' && smartResults && (
-          <div className="results-layout">
-            <Map itineraries={smartResults.itineraries} airportMap={airportMap} />
-            <div className="itinerary-list">
-              <div className="results-header">
-                <span>
-                  {smartResults.itineraries.length} itinerari da{' '}
-                  <strong>{smartResults.origin}</strong>
-                </span>
-              </div>
-              <div className="itinerary-scroll">
-                {smartResults.itineraries.map((it) => (
-                  <ItineraryCard key={it.rank} itinerary={it} travelers={2} />
-                ))}
+          <>
+            <ProviderBadge status={smartResults.provider_status} />
+            <div className="results-layout">
+              <Map itineraries={smartResults.itineraries} airportMap={airportMap} />
+              <div className="itinerary-list">
+                <div className="results-header">
+                  <span>
+                    {smartResults.itineraries.length} itinerari da{' '}
+                    <strong>{smartResults.origin}</strong>
+                  </span>
+                </div>
+                <div className="itinerary-scroll">
+                  {smartResults.itineraries.map((it) => (
+                    <ItineraryCard key={it.rank} itinerary={it} travelers={2} />
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          </>
         )}
       </main>
     </div>

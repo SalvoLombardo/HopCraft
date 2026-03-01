@@ -663,3 +663,43 @@
     gap: 6px 10px;
   }
 }
+
+/* ── Provider Badge ──────────────────────────────────────────────────────── */
+.provider-badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.provider-badge__dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+
+.provider-badge--green .provider-badge__dot  { background: #27ae60; }
+.provider-badge--yellow .provider-badge__dot { background: #f39c12; }
+.provider-badge--red .provider-badge__dot    { background: #e74c3c; }
+
+.provider-badge__label {
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--c-text);
+}
+
+.provider-badge--green  .provider-badge__label { color: #1a7a45; }
+.provider-badge--yellow .provider-badge__label { color: #9a6a00; }
+.provider-badge--red    .provider-badge__label { color: #c0392b; }
+
+.provider-badge__note {
+  color: var(--c-text-muted, #666);
+}

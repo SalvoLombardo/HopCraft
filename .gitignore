@@ -72,6 +72,21 @@ docker-compose.override.yml
 docker-compose.local.yml
 
 # ================================
+# TERRAFORM
+# ================================
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars
+# NON ignorare: *.tf, *.tfvars.example
+
+# ================================
+# PRODUZIONE
+# ================================
+.env.prod
+
+# ================================
 # DATABASE
 # ================================
 *.sql.backup
@@ -125,3 +140,8 @@ temp/
 
 CHECKLIST.md 
 Structure.md
+
+
+#temporary
+infra/
+.env.prod.example

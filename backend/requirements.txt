@@ -19,6 +19,7 @@ httpx>=0.28.0
 # Flight providers
 # fast-flights rimosso: non funziona da ambienti server (Google GDPR consent wall)
 # GoogleFlightsProvider usa SerpAPI via httpx (già incluso sopra)
+# Amadeus: provider primario (2000 req/mese, major carriers)
 
 # Testing
 pytest>=7.0

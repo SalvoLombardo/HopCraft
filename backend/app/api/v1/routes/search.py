@@ -53,7 +53,7 @@ async def search_reverse(
     #Validation area -------------------------------------------
 
 
-    results, cached, fetched_at = await reverse_search(
+    results, cached, fetched_at, provider_status = await reverse_search(
         session=session,
         destination=destination.upper(),
         date_from=date_from,
@@ -88,6 +88,7 @@ async def search_reverse(
         results=offers,
         cached=cached,
         fetched_at=fetched_at,
+        provider_status=provider_status,
     )
 
 

@@ -4,27 +4,35 @@ Itinerary Engine — Pipeline Smart Multi-City (2.3).
 Orchestra l'intera ricerca multi-città in 5 step:
   Step 1: calculate_area()         → raggio, num_stops, aeroporti raggiungibili
   Step 2: generate_with_fallback() → itinerari candidati via AI (JSON)
-  Step 3: verifica prezzi reali via FlightProvider (chiamate parallele asincrone)
+  Step 3: verifica prezzi reali via FlightProvider cascade (chiamate parallele asincrone)
   Step 4: filtraggio per budget + ranking per prezzo
   Step 5: restituzione top 5 come SmartMultiOut
 """
 import asyncio
+import logging
 from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.models.schemas import ItineraryOut, LegOut, SmartMultiOut
+from app.models.schemas import ItineraryOut, LegOut, ProviderStatus, SmartMultiOut
 from app.services.area_calculator import AreaResult, calculate_area
 from app.services.llm.base import SuggestedItinerary
 from app.services.llm.factory import generate_with_fallback
 from app.services.providers.base import FlightOffer, Leg
-from app.services.providers.factory import get_flight_provider
+from app.services.providers.factory import (
+    MONTHLY_WINDOW,
+    PROVIDER_LIMITS,
+    PROVIDER_NOTES,
+    get_provider_quotas,
+    get_providers_in_order,
+)
+from app.utils.rate_limiter import check_rate_limit
 
-# Hint iniettato nel prompt LLM quando il provider voli è Amadeus.
+logger = logging.getLogger(__name__)
+
+# Hint iniettato nel prompt LLM solo quando Amadeus è l'unico provider disponibile.
 # Amadeus free tier non copre le low-cost europee (Ryanair, easyJet, Wizz Air):
 # serve guidare l'AI verso aeroporti principali coperti dalle major carriers.
-# Quando si switcha a google_flights (che copre tutte le compagnie), il hint è "".
 _AMADEUS_PROVIDER_HINT = (
     "Il provider di voli attivo copre solo major carriers (Air France, Lufthansa, "
     "Iberia, BA, KLM, ITA, SAS, TAP, Finnair). Usa ESCLUSIVAMENTE aeroporti principali: "
@@ -35,12 +43,9 @@ _AMADEUS_PROVIDER_HINT = (
 )
 
 # Limite aeroporti inviati all'LLM (i più vicini, già ordinati per distanza).
-# Evita token overflow con liste molto grandi.
 _MAX_AIRPORTS_FOR_LLM = 100
 
-# Massimo task di pricing eseguiti in contemporanea (tutela rate limit API voli).
-# Amadeus test API tollera ~10 req/sec; con 3 itinerari in parallelo e retry su 429
-# si rimane ampiamente sotto quel limite senza penalizzare eccessivamente i tempi.
+# Massimo task di pricing eseguiti in contemporanea.
 _MAX_CONCURRENT_PRICING = 3
 
 
@@ -64,22 +69,13 @@ def _leg_dates(date_from: date, trip_duration_days: int, num_legs: int) -> list[
     """
     Distribuisce le date di partenza di ogni tratta in modo uniforme
     sull'arco del viaggio.
-
-    Esempio: date_from=01/06, trip=12 giorni, 4 tratte
-      → [01/06, 04/06, 07/06, 10/06]
     """
     days_per_leg = trip_duration_days // num_legs
     return [date_from + timedelta(days=i * days_per_leg) for i in range(num_legs)]
 
 
 def _days_per_stop(trip_duration_days: int, num_stops: int) -> list[int]:
-    """
-    Distribuisce i giorni del viaggio tra le tappe intermedie.
-    I giorni rimanenti (modulo) vengono distribuiti sulle prime tappe.
-
-    Esempio: 12 giorni, 3 tappe → [4, 4, 4]
-             13 giorni, 3 tappe → [5, 4, 4]
-    """
+    """Distribuisce i giorni del viaggio tra le tappe intermedie."""
     if num_stops <= 0:
         return []
     base = trip_duration_days // num_stops
@@ -88,25 +84,17 @@ def _days_per_stop(trip_duration_days: int, num_stops: int) -> list[int]:
 
 
 def _is_valid_route(route: list[str], origin: str) -> bool:
-    """
-    Valida la struttura della rotta restituita dall'AI.
-
-    Criteri:
-    - Almeno 3 elementi (origine + 1 tappa + ritorno)
-    - Inizia e finisce con l'origine
-    - Nessuna tappa intermedia duplicata
-    """
+    """Valida la struttura della rotta restituita dall'AI."""
     if len(route) < 3:
         return False
     if route[0] != origin or route[-1] != origin:
         return False
-    # No duplicati nelle tappe intermedie (route[1:-1])
     intermediate = route[1:-1]
     return len(intermediate) == len(set(intermediate))
 
 
 # ---------------------------------------------------------------------------
-# Step 3 helper — pricing di un singolo itinerario
+# Step 3 helper — pricing di un singolo itinerario con cascade provider
 # ---------------------------------------------------------------------------
 
 async def _price_itinerary(
@@ -116,12 +104,11 @@ async def _price_itinerary(
     trip_duration_days: int,
     direct_only: bool,
     semaphore: asyncio.Semaphore,
+    providers_in_order: list,
 ) -> tuple[SuggestedItinerary, list[FlightOffer]] | None:
     """
-    Recupera il prezzo più basso per ogni tratta dell'itinerario suggerito.
-
-    Restituisce (SuggestedItinerary, lista FlightOffer) se tutte le tratte
-    hanno almeno un volo disponibile, None altrimenti.
+    Recupera il prezzo più basso per ogni tratta dell'itinerario suggerito,
+    usando la cascade provider (SerpAPI → Ryanair → Amadeus).
     """
     if not _is_valid_route(suggested.route, origin):
         return None
@@ -136,11 +123,20 @@ async def _price_itinerary(
     ]
 
     async with semaphore:
-        provider = get_flight_provider()
-        offers = await provider.search_multi_city(legs)
+        offers: list[FlightOffer] = []
+        for provider_name, provider in providers_in_order:
+            rate_key = f"{provider_name}:monthly"
+            allowed = await check_rate_limit(rate_key, PROVIDER_LIMITS[provider_name], MONTHLY_WINDOW)
+            if not allowed:
+                continue
+            try:
+                offers = await provider.search_multi_city(legs)
+                if offers:
+                    break
+            except Exception as exc:
+                logger.warning("Provider %s fallito per itinerario %s: %s", provider_name, route, exc)
+                continue
 
-    # search_multi_city restituisce una FlightOffer per ogni tratta trovata;
-    # se una tratta non ha voli disponibili non viene inclusa → itinerario incompleto.
     if len(offers) < num_legs:
         return None
 
@@ -164,40 +160,30 @@ async def run_smart_multi(
     """
     Pipeline completa Smart Multi-City.
 
-    Args:
-        session:               sessione DB asincrona
-        origin:                IATA aeroporto di partenza/ritorno (es. "CTA")
-        trip_duration_days:    durata totale del viaggio in giorni
-        budget_per_person_eur: budget massimo per persona (solo voli)
-        travelers:             numero di viaggiatori
-        date_from:             data di partenza del primo volo
-        date_to:               data entro cui il viaggio deve terminare
-        direct_only:           filtra solo voli diretti
-
     Returns:
-        SmartMultiOut con i top 5 itinerari ordinati per prezzo.
-
-    Raises:
-        ValueError:   se l'aeroporto di origine non esiste nel DB.
-        RuntimeError: se tutti i provider LLM falliscono.
+        SmartMultiOut con i top 5 itinerari ordinati per prezzo + provider_status.
     """
 
-    # ── Step 1: Getting info about the area, contains :origin_iata=origin_iata,radius_km,num_stops,reacheble airports
+    # ── Step 1: area esplorabile
     explorable_area_details: AreaResult = await calculate_area(session, origin, trip_duration_days)
 
-    # ── Step 2: genereting itineraries with AI 
-    allowed_num_legs = explorable_area_details.num_stops + 1 #Adding 1 for the return
+    # ── Cascade provider setup (fatto prima dello Step 2 per calcolare il provider_hint)
+    providers_in_order = await get_providers_in_order()
+    provider_names = [name for name, _ in providers_in_order]
+    active_provider = provider_names[0] if provider_names else "none"
+
+    # Il provider_hint guida l'AI solo quando Amadeus è l'unico disponibile
+    only_amadeus = provider_names == ["amadeus"]
+    provider_hint = _AMADEUS_PROVIDER_HINT if only_amadeus else ""
+
+    # ── Step 2: generazione itinerari via AI
+    allowed_num_legs = explorable_area_details.num_stops + 1
     budget_per_leg = budget_per_person_eur / allowed_num_legs
     season = _season_from_date(date_from)
 
-    # Limiting airports for _MAX_AIRPORTS_FOR_LLM (exclude token overflow) the airports are already ordered by 'calculate_area()'
     airports_for_llm = explorable_area_details.airports[:_MAX_AIRPORTS_FOR_LLM]
     available_airports = [f"{a.iata_code} ({a.city})" for a in airports_for_llm]
-    # Vincolo provider-specifico: Amadeus copre solo major carriers → guida l'AI
-    # verso aeroporti principali. Con google_flights (copre tutte le compagnie) hint="".
-    provider_hint = _AMADEUS_PROVIDER_HINT if settings.flight_provider == "amadeus" else ""
 
-    #Routing here Calling the orchestrator - generate_itineraries - build_prompt - parsing - returning 'list[SuggestedItinerary]objs'
     suggestions: list[SuggestedItinerary] = await generate_with_fallback(
         origin=origin,
         duration_days=trip_duration_days,
@@ -208,23 +194,20 @@ async def run_smart_multi(
         provider_hint=provider_hint,
     )
 
-    # ── Step 3: verifica prezzi reali (parallelo, con limite concorrenza) ───
+    # ── Step 3: verifica prezzi reali (parallelo, con limite concorrenza)
     semaphore = asyncio.Semaphore(_MAX_CONCURRENT_PRICING)
     tasks = [
-        _price_itinerary(s, origin, date_from, trip_duration_days, direct_only, semaphore)
+        _price_itinerary(s, origin, date_from, trip_duration_days, direct_only, semaphore, providers_in_order)
         for s in suggestions
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # ── Step 4: filtraggio per budget + ranking ──────────────────────────────
-    # Conta le cause di scarto per fornire messaggi di errore precisi.
-    n_no_data = 0      # tratte senza voli dal provider (gap copertura)
-    n_over_budget = 0  # itinerari completi ma oltre il budget
+    # ── Step 4: filtraggio per budget + ranking
+    n_no_data = 0
+    n_over_budget = 0
 
     priced: list[tuple[SuggestedItinerary, list[FlightOffer], float]] = []
     for res in results:
-        # None = itinerario incompleto (una o più tratte senza voli disponibili)
-        # Exception = errore provider su quell'itinerario
         if res is None or isinstance(res, Exception):
             n_no_data += 1
             continue
@@ -235,7 +218,7 @@ async def run_smart_multi(
             continue
         priced.append((suggested, offers, total_per_person))
 
-    priced.sort(key=lambda x: x[2])  # prezzo totale per persona, crescente
+    priced.sort(key=lambda x: x[2])
     top5 = priced[:5]
 
     if not top5:
@@ -257,13 +240,12 @@ async def run_smart_multi(
                 f"{n_over_budget} oltre il budget di €{budget_per_person_eur:.0f}/persona. "
                 "Prova con date diverse o aumenta il budget."
             )
-        # Nessun itinerario generato dall'AI o tutti con rotta invalida
         raise ValueError(
             "L'AI non ha generato itinerari validi per i parametri forniti. "
             "Prova con un'origine diversa o date diverse."
         )
 
-    # ── Step 5: costruzione risposta ────────────────────────────────────────
+    # ── Step 5: costruzione risposta
     itineraries: list[ItineraryOut] = []
     for rank, (suggested, offers, total_per_person) in enumerate(top5, start=1):
         legs_out = [
@@ -278,7 +260,6 @@ async def run_smart_multi(
             )
             for o in offers
         ]
-        # Numero di tappe intermedie = aeroporti della rotta - origine - ritorno
         num_stops_in_route = len(suggested.route) - 2
         itineraries.append(
             ItineraryOut(
@@ -288,10 +269,16 @@ async def run_smart_multi(
                 total_price_all_travelers_eur=round(total_per_person * travelers, 2),
                 legs=legs_out,
                 ai_notes=suggested.reasoning,
-                suggested_days_per_stop=_days_per_stop(
-                    trip_duration_days, num_stops_in_route
-                ),
+                suggested_days_per_stop=_days_per_stop(trip_duration_days, num_stops_in_route),
             )
         )
 
-    return SmartMultiOut(origin=origin, itineraries=itineraries)
+    quotas = await get_provider_quotas()
+    provider_status = ProviderStatus(
+        active_provider=active_provider,
+        serpapi_remaining=quotas.get("serpapi", 0),
+        amadeus_remaining=quotas.get("amadeus", 0),
+        note=PROVIDER_NOTES.get(active_provider, ""),
+    )
+
+    return SmartMultiOut(origin=origin, itineraries=itineraries, provider_status=provider_status)
