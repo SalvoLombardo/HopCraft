@@ -17,18 +17,31 @@ export default function SmartSearchForm({ airports, onSearch, loading }) {
   const [dateFrom, setDateFrom] = useState(() => addDays(todayStr(), 30))
   const [dateTo, setDateTo] = useState(() => addDays(todayStr(), 42))
   const [directOnly, setDirectOnly] = useState(false)
+  const [formError, setFormError] = useState(null)
 
   const handleDateFromChange = (val) => {
     setDateFrom(val)
     if (dateTo <= val) setDateTo(addDays(val, 12))
+    setFormError(null)
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
     const orig = origin.trim().toUpperCase()
-    if (orig.length !== 3) return
+    if (orig.length !== 3) {
+      setFormError('Inserisci un codice IATA valido (es. CTA, FCO, MXP) — esattamente 3 lettere.')
+      return
+    }
     const tripDays = Math.round((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24))
-    if (tripDays < 5 || tripDays > 25) return
+    if (tripDays < 5) {
+      setFormError('La durata minima del viaggio è 5 giorni.')
+      return
+    }
+    if (tripDays > 25) {
+      setFormError(`Durata viaggio: ${tripDays} giorni. Il massimo supportato è 25 — riduci l'intervallo di date.`)
+      return
+    }
+    setFormError(null)
     onSearch({ origin: orig, tripDurationDays: tripDays, budgetPerPerson: budget, travelers, dateFrom, dateTo, directOnly })
   }
 
@@ -117,6 +130,8 @@ export default function SmartSearchForm({ airports, onSearch, loading }) {
           Solo diretti
         </label>
       </div>
+
+      {formError && <p className="form-error">{formError}</p>}
 
       <button className="search-btn" type="submit" disabled={loading}>
         {loading ? 'Analisi AI...' : 'Trova itinerari'}

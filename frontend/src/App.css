@@ -173,6 +173,13 @@
   cursor: not-allowed;
 }
 
+/* ── Form validation error (inline nel form) ─────────── */
+.form-error {
+  color: var(--c-error);
+  font-size: 0.85rem;
+  margin: 4px 0 0;
+}
+
 /* ── Error bar ───────────────────────────────────────── */
 .error-bar {
   background: var(--c-error);
