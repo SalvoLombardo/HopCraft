@@ -99,14 +99,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # GHCR requires lowercase repository names
+      - name: Set lowercase image name
+        run: |
+          echo "IMAGE=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/hopcraft-backend" >> $GITHUB_ENV
+
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
           context: backend
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/hopcraft-backend:latest
-            ghcr.io/${{ github.repository_owner }}/hopcraft-backend:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
 
       # -----------------------------------------------------------------------
       # Frontend: build React e upload su S3
@@ -156,8 +161,8 @@ jobs:
             set -e
             cd /opt/hopcraft
 
-            # Imposta il tag dell'immagine per questo deploy
-            export BACKEND_IMAGE="ghcr.io/${{ github.repository_owner }}/hopcraft-backend:${{ github.sha }}"
+            # Imposta il tag dell'immagine per questo deploy (IMAGE già in lowercase)
+            export BACKEND_IMAGE="${{ env.IMAGE }}:${{ github.sha }}"
 
             # Pull immagine aggiornata (GHCR pubblico — no autenticazione)
             docker pull "$BACKEND_IMAGE"
