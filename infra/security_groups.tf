@@ -7,7 +7,7 @@ resource "aws_security_group" "hopcraft" {
   # aws_ec2_managed_prefix_list "cloudfront" ma richiede lookup extra.
   # Per semplicità, 0.0.0.0/0 su 80 è accettabile: il backend non serve dati sensibili.
   ingress {
-    description = "HTTP (CloudFront → Nginx)"
+    description = "HTTP (CloudFront to Nginx)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
