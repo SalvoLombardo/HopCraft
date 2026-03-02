@@ -56,10 +56,29 @@ def _all_providers() -> list[tuple[str, FlightProvider]]:
 async def get_providers_in_order() -> list[tuple[str, FlightProvider]]:
     """
     Restituisce i provider con quota residua nell'ordine cascade.
+
+    Se settings.flight_provider è impostato su un provider noto ("serpapi" o "amadeus"),
+    quel provider viene messo in testa alla lista indipendentemente dall'ordine di default.
+    Utile in sviluppo per forzare Amadeus (più quota) e preservare i crediti SerpAPI.
+
+    Esempio .env:
+        FLIGHT_PROVIDER=amadeus   → ordine [amadeus, serpapi]
+        FLIGHT_PROVIDER=serpapi   → ordine [serpapi, amadeus]  (default)
+        FLIGHT_PROVIDER=cascade   → ordine [serpapi, amadeus]  (cascade automatica)
+
     Se tutti sono esauriti restituisce lista vuota.
     """
+    ordered = _all_providers()
+
+    forced = settings.flight_provider
+    if forced in PROVIDER_LIMITS:
+        ordered = (
+            [p for p in ordered if p[0] == forced]
+            + [p for p in ordered if p[0] != forced]
+        )
+
     result = []
-    for name, provider in _all_providers():
+    for name, provider in ordered:
         remaining = await get_remaining(f"{name}:monthly", PROVIDER_LIMITS[name])
         if remaining > 0:
             result.append((name, provider))
