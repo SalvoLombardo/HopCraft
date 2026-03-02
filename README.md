@@ -89,7 +89,7 @@ All free tiers, no credit card needed:
 | Groq | [console.groq.com](https://console.groq.com) | LLM fallback |
 | Mistral | [console.mistral.ai](https://console.mistral.ai) | LLM fallback |
 
-> **During development** set `FLIGHT_PROVIDER=amadeus` in your `.env` to use Amadeus first and preserve the 250 SerpAPI monthly credits for production. See [docs/SETUP.md](docs/SETUP.md) for the full variable reference.
+> The provider cascade (SerpAPI → Amadeus) is **automatic** — no config variable needed. SerpAPI is tried first; when its monthly quota is exhausted, the app falls back to Amadeus transparently. See [docs/SETUP.md](docs/SETUP.md) for the full variable reference.
 
 ---
 

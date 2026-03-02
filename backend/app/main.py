@@ -4,16 +4,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
-)
-
 from app.config import settings
 from app.db.database import engine, Base
 from app.db.redis import get_redis, close_redis
 from app.api.v1.router import api_router
 import app.models  # noqa: F401 — registra tutti i modelli con Base
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
+)
 
 ###############---############
 # REMEMBER TO SWITCH TO Alembic migrations IN PROD

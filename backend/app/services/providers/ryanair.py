@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 _client = RyanAir(currency="EUR")
 
 
-def _sync_search(origin: str, destination: str, date_from: date, date_to: date) -> list[FlightOffer]:
+def _sync_search(
+    origin: str, destination: str, date_from: date, date_to: date
+) -> list[FlightOffer]:
     """Chiama Flyan in modo sincrono e normalizza i risultati in FlightOffer."""
     params = FlightSearchParams(
         from_airport=origin,
@@ -73,7 +75,10 @@ class RyanairProvider(FlightProvider):
         try:
             offers = await asyncio.to_thread(_sync_search, origin, destination, date_from, date_to)
         except Exception as exc:
-            logger.warning("RyanairProvider %s→%s [%s/%s]: %s", origin, destination, date_from, date_to, exc)
+            logger.warning(
+                "RyanairProvider %s→%s [%s/%s]: %s",
+                origin, destination, date_from, date_to, exc,
+            )
             return []
         offers.sort(key=lambda o: o.price_eur)
         return offers[:max_results]

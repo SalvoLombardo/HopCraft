@@ -23,10 +23,11 @@ from app.services.providers.base import FlightOffer
 
 def _cutoff() -> datetime:
     """I'm using this to set the cutoff separately and having this allow to verify
-    if the FlightCache.fetched_at(see below async def get_cached ) is later of our cutoff
-    In this way if FlightCache.fetched_at >= _cutoff() it will means that the data is still valueable and usable
+    if the FlightCache.fetched_at(see below async def get_cached ) is later of our cutoff.
+    If FlightCache.fetched_at >= _cutoff() it means that the data is still valid and usable.
     """
-    return (datetime.now(timezone.utc) - timedelta(hours=settings.cache_ttl_hours)).replace(tzinfo=None)
+    delta = timedelta(hours=settings.cache_ttl_hours)
+    return (datetime.now(timezone.utc) - delta).replace(tzinfo=None)
 
 
 ########################################################################
@@ -52,7 +53,8 @@ async def get_cached(
         FlightCache.fetched_at >= _cutoff(),
     )
     result = await session.execute(stmt)
-    row = result.scalar_one_or_none() #scalar_one_or_none used to get only one result (simple cache logic)
+    # scalar_one_or_none: returns one result or None (simple cache logic)
+    row = result.scalar_one_or_none()
 
     if row is None:
         return None

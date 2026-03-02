@@ -84,7 +84,9 @@ async def reverse_search(
         airport_map = {
             code: airport
             for code, airport in airport_map.items()
-            if haversine_km(origin_lat, origin_lon, airport.latitude, airport.longitude) <= radius_km
+            if haversine_km(
+                origin_lat, origin_lon, airport.latitude, airport.longitude
+            ) <= radius_km
         }
 
     # --- 2. Building 7days range
@@ -110,7 +112,9 @@ async def reverse_search(
         cheapest = min(offers, key=lambda o: o.price_eur)
         prev = cache_best.get(single_flight_cache_obj.origin)
         if prev is None or cheapest.price_eur < prev[0].price_eur:
-            cache_best[single_flight_cache_obj.origin] = (cheapest, single_flight_cache_obj.fetched_at)
+            cache_best[single_flight_cache_obj.origin] = (
+                cheapest, single_flight_cache_obj.fetched_at
+            )
 
     # --- 4. Missing origins
     all_origins = set(airport_map.keys())
@@ -126,7 +130,9 @@ async def reverse_search(
     async def _fetch(origin: str) -> None:
         for provider_name, provider in providers_in_order:
             rate_key = f"{provider_name}:monthly"
-            allowed = await check_rate_limit(rate_key, PROVIDER_LIMITS[provider_name], MONTHLY_WINDOW)
+            allowed = await check_rate_limit(
+                rate_key, PROVIDER_LIMITS[provider_name], MONTHLY_WINDOW
+            )
             if not allowed:
                 continue
             try:
@@ -139,7 +145,10 @@ async def reverse_search(
 
                 # Salva in cache per data
                 for single_date in date_list:
-                    day_offers = [o for o in offers if o.departure.startswith(single_date.isoformat())]
+                    day_offers = [
+                        o for o in offers
+                        if o.departure.startswith(single_date.isoformat())
+                    ]
                     if day_offers:
                         await save_to_cache(session, origin, destination, single_date, day_offers)
                 fresh_best[origin] = min(offers, key=lambda o: o.price_eur)

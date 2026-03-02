@@ -126,7 +126,9 @@ async def _price_itinerary(
         offers: list[FlightOffer] = []
         for provider_name, provider in providers_in_order:
             rate_key = f"{provider_name}:monthly"
-            allowed = await check_rate_limit(rate_key, PROVIDER_LIMITS[provider_name], MONTHLY_WINDOW)
+            allowed = await check_rate_limit(
+                rate_key, PROVIDER_LIMITS[provider_name], MONTHLY_WINDOW
+            )
             if not allowed:
                 continue
             try:
@@ -134,7 +136,9 @@ async def _price_itinerary(
                 if offers:
                     break
             except Exception as exc:
-                logger.warning("Provider %s fallito per itinerario %s: %s", provider_name, route, exc)
+                logger.warning(
+                    "Provider %s fallito per itinerario %s: %s", provider_name, route, exc
+                )
                 continue
 
     if len(offers) < num_legs:
@@ -197,7 +201,9 @@ async def run_smart_multi(
     # ── Step 3: verifica prezzi reali (parallelo, con limite concorrenza)
     semaphore = asyncio.Semaphore(_MAX_CONCURRENT_PRICING)
     tasks = [
-        _price_itinerary(s, origin, date_from, trip_duration_days, direct_only, semaphore, providers_in_order)
+        _price_itinerary(
+            s, origin, date_from, trip_duration_days, direct_only, semaphore, providers_in_order
+        )
         for s in suggestions
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)

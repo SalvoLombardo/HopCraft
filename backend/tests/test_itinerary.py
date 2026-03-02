@@ -7,9 +7,7 @@ Copertura:
   - calculate_area    — DB mockato
   - run_smart_multi   — tutti i layer mockati (DB, LLM, FlightProvider cascade)
 """
-import asyncio
-from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -291,11 +289,14 @@ class TestRunSmartMulti:
 
         session = AsyncMock()
 
-        with patch("app.services.itinerary_engine.calculate_area", new=AsyncMock(return_value=_make_area_result())), \
-             patch("app.services.itinerary_engine.generate_with_fallback", new=AsyncMock(return_value=suggestions)), \
+        with patch("app.services.itinerary_engine.calculate_area",
+                   new=AsyncMock(return_value=_make_area_result())), \
+             patch("app.services.itinerary_engine.generate_with_fallback",
+                   new=AsyncMock(return_value=suggestions)), \
              patch("app.services.itinerary_engine.get_providers_in_order",
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
-             patch("app.services.itinerary_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.itinerary_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.itinerary_engine.get_provider_quotas",
                    new=AsyncMock(return_value={"serpapi": 200, "amadeus": 1800})):
 
@@ -327,16 +328,21 @@ class TestRunSmartMulti:
 
         session = AsyncMock()
 
-        with patch("app.services.itinerary_engine.calculate_area", new=AsyncMock(return_value=_make_area_result())), \
-             patch("app.services.itinerary_engine.generate_with_fallback", new=AsyncMock(return_value=suggestions)), \
+        with patch("app.services.itinerary_engine.calculate_area",
+                   new=AsyncMock(return_value=_make_area_result())), \
+             patch("app.services.itinerary_engine.generate_with_fallback",
+                   new=AsyncMock(return_value=suggestions)), \
              patch("app.services.itinerary_engine.get_providers_in_order",
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
-             patch("app.services.itinerary_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.itinerary_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.itinerary_engine.get_provider_quotas",
                    new=AsyncMock(return_value={"serpapi": 200, "amadeus": 1800})):
 
             with pytest.raises(ValueError, match="oltre il budget"):
-                await run_smart_multi(session=session, **{**SMART_PARAMS, "budget_per_person_eur": 50.0})
+                await run_smart_multi(
+                    session=session, **{**SMART_PARAMS, "budget_per_person_eur": 50.0}
+                )
 
     async def test_no_flights_found_raises(self):
         """Il provider non trova voli per nessuna rotta → ValueError con 'senza copertura'."""
@@ -347,11 +353,14 @@ class TestRunSmartMulti:
 
         session = AsyncMock()
 
-        with patch("app.services.itinerary_engine.calculate_area", new=AsyncMock(return_value=_make_area_result())), \
-             patch("app.services.itinerary_engine.generate_with_fallback", new=AsyncMock(return_value=suggestions)), \
+        with patch("app.services.itinerary_engine.calculate_area",
+                   new=AsyncMock(return_value=_make_area_result())), \
+             patch("app.services.itinerary_engine.generate_with_fallback",
+                   new=AsyncMock(return_value=suggestions)), \
              patch("app.services.itinerary_engine.get_providers_in_order",
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
-             patch("app.services.itinerary_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.itinerary_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.itinerary_engine.get_provider_quotas",
                    new=AsyncMock(return_value={"serpapi": 200, "amadeus": 1800})):
 
@@ -362,7 +371,8 @@ class TestRunSmartMulti:
         """Se generate_with_fallback lancia RuntimeError, run_smart_multi rilancia."""
         session = AsyncMock()
 
-        with patch("app.services.itinerary_engine.calculate_area", new=AsyncMock(return_value=_make_area_result())), \
+        with patch("app.services.itinerary_engine.calculate_area",
+                   new=AsyncMock(return_value=_make_area_result())), \
              patch("app.services.itinerary_engine.get_providers_in_order",
                    new=AsyncMock(return_value=[])), \
              patch("app.services.itinerary_engine.generate_with_fallback",
@@ -393,16 +403,21 @@ class TestRunSmartMulti:
 
         session = AsyncMock()
 
-        with patch("app.services.itinerary_engine.calculate_area", new=AsyncMock(return_value=_make_area_result())), \
-             patch("app.services.itinerary_engine.generate_with_fallback", new=AsyncMock(return_value=suggestions)), \
+        with patch("app.services.itinerary_engine.calculate_area",
+                   new=AsyncMock(return_value=_make_area_result())), \
+             patch("app.services.itinerary_engine.generate_with_fallback",
+                   new=AsyncMock(return_value=suggestions)), \
              patch("app.services.itinerary_engine.get_providers_in_order",
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
-             patch("app.services.itinerary_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.itinerary_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.itinerary_engine.get_provider_quotas",
                    new=AsyncMock(return_value={"serpapi": 200, "amadeus": 1800})):
 
             with pytest.raises(ValueError):
-                await run_smart_multi(session=session, **{**SMART_PARAMS, "budget_per_person_eur": 50.0})
+                await run_smart_multi(
+                    session=session, **{**SMART_PARAMS, "budget_per_person_eur": 50.0}
+                )
 
     async def test_travelers_multiplies_total_price(self):
         """Il prezzo totale per tutti i viaggiatori = prezzo/persona × viaggiatori."""
@@ -414,11 +429,14 @@ class TestRunSmartMulti:
 
         session = AsyncMock()
 
-        with patch("app.services.itinerary_engine.calculate_area", new=AsyncMock(return_value=_make_area_result())), \
-             patch("app.services.itinerary_engine.generate_with_fallback", new=AsyncMock(return_value=suggestions)), \
+        with patch("app.services.itinerary_engine.calculate_area",
+                   new=AsyncMock(return_value=_make_area_result())), \
+             patch("app.services.itinerary_engine.generate_with_fallback",
+                   new=AsyncMock(return_value=suggestions)), \
              patch("app.services.itinerary_engine.get_providers_in_order",
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
-             patch("app.services.itinerary_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.itinerary_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.itinerary_engine.get_provider_quotas",
                    new=AsyncMock(return_value={"serpapi": 200, "amadeus": 1800})):
 

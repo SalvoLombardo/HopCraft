@@ -16,7 +16,9 @@ from app.services.providers.base import FlightOffer
 # Aeroporti fittizi
 # ---------------------------------------------------------------------------
 
-def _make_airport(iata: str, city: str, lat: float, lon: float, country: str = "Italy") -> MagicMock:
+def _make_airport(
+    iata: str, city: str, lat: float, lon: float, country: str = "Italy"
+) -> MagicMock:
     a = MagicMock()
     a.iata_code = iata
     a.city = city

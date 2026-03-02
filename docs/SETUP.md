@@ -182,6 +182,26 @@ ruff check --select E,F --line-length 100 app/ tests/
 
 ## Production Deploy (AWS)
 
+### EC2 Bootstrap — Docker Compose on Amazon Linux 2023
+
+Amazon Linux 2023 ships with Docker but **not** the Compose plugin. Install it manually after provisioning the instance (Terraform `user_data` can automate this):
+
+```bash
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl -SL \
+  "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+docker compose version   # verify
+```
+
+Also add `ec2-user` to the `docker` group so you don't need `sudo`:
+
+```bash
+sudo usermod -aG docker ec2-user
+newgrp docker
+```
+
 ### Infrastructure with Terraform
 
 ```bash

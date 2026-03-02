@@ -127,7 +127,8 @@ class TestReverseSearch:
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
              patch("app.services.search_engine.get_provider_quotas",
                    new=AsyncMock(return_value=_FAKE_QUOTAS)), \
-             patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.search_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
             results, all_from_cache, _, status = await reverse_search(
@@ -158,7 +159,8 @@ class TestReverseSearch:
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
              patch("app.services.search_engine.get_provider_quotas",
                    new=AsyncMock(return_value=_FAKE_QUOTAS)), \
-             patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.search_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
             results, all_from_cache, _, _ = await reverse_search(
@@ -183,7 +185,8 @@ class TestReverseSearch:
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
              patch("app.services.search_engine.get_provider_quotas",
                    new=AsyncMock(return_value=_FAKE_QUOTAS)), \
-             patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=False)), \
+             patch("app.services.search_engine.check_rate_limit",
+                   new=AsyncMock(return_value=False)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
             results, all_from_cache, _, _ = await reverse_search(
@@ -215,7 +218,8 @@ class TestReverseSearch:
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
              patch("app.services.search_engine.get_provider_quotas",
                    new=AsyncMock(return_value=_FAKE_QUOTAS)), \
-             patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.search_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()), \
              caplog.at_level(logging.WARNING, logger="app.services.search_engine"):
 
@@ -254,7 +258,8 @@ class TestReverseSearch:
                    new=AsyncMock(return_value=[])), \
              patch("app.services.search_engine.get_provider_quotas",
                    new=AsyncMock(return_value=_FAKE_QUOTAS)), \
-             patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.search_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
             results, _, _, _ = await reverse_search(
@@ -287,7 +292,8 @@ class TestReverseSearch:
                    new=AsyncMock(return_value=[("serpapi", mock_provider)])), \
              patch("app.services.search_engine.get_provider_quotas",
                    new=AsyncMock(return_value=_FAKE_QUOTAS)), \
-             patch("app.services.search_engine.check_rate_limit", new=AsyncMock(return_value=True)), \
+             patch("app.services.search_engine.check_rate_limit",
+                   new=AsyncMock(return_value=True)), \
              patch("app.services.search_engine.save_to_cache", new=AsyncMock()):
 
             await reverse_search(

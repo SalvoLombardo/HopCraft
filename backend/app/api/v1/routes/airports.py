@@ -41,8 +41,8 @@ async def airports_in_radius(
     radius_km: Annotated[int, Query(ge=1, le=10000, description="Raggio in km")] = 2000,
 ) -> list[AirportNearbyOut]:
     """
-    To get active airports from a starting point to a certain radius (lat, lon) order by distance ASC
-    Used by Smart Multi-City to obtain reacheble destination
+    Get active airports within a given radius (lat, lon), ordered by distance ASC.
+    Used by Smart Multi-City to obtain reachable destinations.
     """
     result = await session.execute(
         select(Airport).where(Airport.is_active.is_(True))
