@@ -166,7 +166,8 @@ jobs:
             docker pull "$BACKEND_IMAGE"
 
             # Riavvia solo backend + nginx (postgres e redis rimangono invariati)
-            docker compose -f docker-compose.prod.yml up -d --no-deps backend nginx
+            # --env-file necessario per la sostituzione variabili nel compose file (es. ${DB_PASSWORD})
+            docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --no-deps backend nginx
 
             # Rimuovi immagini vecchie per liberare spazio (t3.micro ha 20GB)
             docker image prune -f
