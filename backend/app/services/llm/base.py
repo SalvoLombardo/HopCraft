@@ -124,4 +124,4 @@ def parse_itineraries(raw: str) -> list[SuggestedItinerary]:
         return result
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         logger.warning("parse_itineraries failed: %s. Raw (500 chars): %.500s", exc, raw)
-        raise ValueError(f"Invalid LLM response: {exc}") from exc
+        raise ValueError(f"Risposta LLM non valida: {exc}") from exc

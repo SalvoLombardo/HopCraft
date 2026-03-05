@@ -57,12 +57,12 @@ def _season_from_date(d: date) -> str:
     """Returns the season name for the given departure date."""
     month = d.month
     if month in (3, 4, 5):
-        return "spring"
+        return "primavera"
     if month in (6, 7, 8):
-        return "summer"
+        return "estate"
     if month in (9, 10, 11):
-        return "autumn"
-    return "winter"
+        return "autunno"
+    return "inverno"
 
 
 def _leg_dates(date_from: date, trip_duration_days: int, num_legs: int) -> list[date]:
@@ -229,15 +229,15 @@ async def run_smart_multi(
     if not top5:
         if n_no_data > 0 and n_over_budget == 0:
             raise ValueError(
-                f"The flight provider found no flights for the AI-suggested routes "
-                f"({n_no_data} itineraries without coverage). "
-                "Try different dates, an origin with more connections, or switch provider."
+                f"Il provider non ha trovato voli per le rotte suggerite dall'AI "
+                f"({n_no_data} itinerari senza copertura). "
+                "Prova date diverse, un'origine con più connessioni, o cambia provider."
             )
         if n_over_budget > 0 and n_no_data == 0:
             raise ValueError(
-                f"Found {n_over_budget} itineraries but all exceed the budget of "
-                f"€{budget_per_person_eur:.0f}/person. "
-                "Try increasing the budget or the trip duration."
+                f"Trovati {n_over_budget} itinerari ma tutti oltre il budget di "
+                f"€{budget_per_person_eur:.0f}/persona. "
+                "Prova ad aumentare il budget o la durata del viaggio."
             )
         if n_no_data > 0 and n_over_budget > 0:
             raise ValueError(
