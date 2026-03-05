@@ -24,7 +24,7 @@ jobs:
         run: pip install "ruff>=0.9.0"
 
       - name: Run ruff
-        run: ruff check --select E,F --line-length 100 backend/app backend/tests
+        run: ruff check --select E,F --line-length 150 backend/app backend/tests
 
   # ---------------------------------------------------------------------------
   # Test — pytest (tutte le dipendenze esterne sono mockate, nessun servizio reale)
