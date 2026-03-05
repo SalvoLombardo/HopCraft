@@ -182,12 +182,14 @@ class AmadeusProvider(FlightProvider):
         self,
         legs: list[Leg],
     ) -> list[FlightOffer]:
-        """Searches each leg sequentially and returns the cheapest offer per leg."""
-        result: list[FlightOffer] = []
-        for leg in legs:
-            leg_offers = await self.search_one_way(
-                leg.origin, leg.destination, leg.date, leg.date, max_results=5
-            )
+        """Searches all legs in parallel and returns the cheapest offer per leg."""
+        tasks = [
+            self.search_one_way(leg.origin, leg.destination, leg.date, leg.date, max_results=5)
+            for leg in legs
+        ]
+        results = await asyncio.gather(*tasks)
+        offers: list[FlightOffer] = []
+        for leg_offers in results:
             if leg_offers:
-                result.append(min(leg_offers, key=lambda o: o.price_eur))
-        return result
+                offers.append(min(leg_offers, key=lambda o: o.price_eur))
+        return offers

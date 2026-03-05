@@ -25,6 +25,7 @@ resource "aws_cloudfront_distribution" "hopcraft" {
       https_port             = 443
       origin_protocol_policy = "http-only" # Nginx su EC2 parla HTTP (TLS termina a CF)
       origin_ssl_protocols   = ["TLSv1.2"]
+      origin_read_timeout    = 60          # default 30s → insufficiente per Amadeus + LLM
     }
   }
 

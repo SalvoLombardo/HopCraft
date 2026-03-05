@@ -43,7 +43,7 @@ _AMADEUS_PROVIDER_HINT = (
 )
 
 # Maximum airports sent to the LLM (the closest ones, already sorted by distance)
-_MAX_AIRPORTS_FOR_LLM = 100
+_MAX_AIRPORTS_FOR_LLM = 50
 
 # Maximum concurrent pricing tasks
 _MAX_CONCURRENT_PRICING = 3
