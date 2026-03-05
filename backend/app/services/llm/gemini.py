@@ -1,10 +1,10 @@
 """
-GeminiProvider — Google Gemini 2.5 Flash (provider primario).
+GeminiProvider — Google Gemini 2.5 Flash (primary provider).
 
-Free tier: 10 req/min, 250 req/giorno, 250K token/min.
-Nessuna carta di credito. API key su aistudio.google.com.
+Free tier: 10 req/min, 250 req/day, 250K tokens/min.
+No credit card required. API key available at aistudio.google.com.
 
-Usa responseMimeType: "application/json" per forzare output JSON strutturato.
+Uses responseMimeType: "application/json" to enforce structured JSON output.
 """
 import httpx
 

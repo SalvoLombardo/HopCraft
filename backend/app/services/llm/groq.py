@@ -1,10 +1,10 @@
 """
-GroqProvider — Llama 3.3 70B via Groq (fallback veloce).
+GroqProvider — Llama 3.3 70B via Groq (fast fallback).
 
-Free tier permanente, >300 token/sec.
-Nessuna carta di credito. Registrazione su console.groq.com.
+Permanent free tier, >300 tokens/sec.
+No credit card required. Sign up at console.groq.com.
 
-API OpenAI-compatibile: usa response_format json_object per output strutturato.
+OpenAI-compatible API: uses response_format json_object for structured output.
 """
 import httpx
 
