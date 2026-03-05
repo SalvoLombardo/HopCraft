@@ -71,4 +71,22 @@ resource "aws_instance" "hopcraft" {
   tags = {
     Name = "hopcraft-backend"
   }
+
+  # Evita che Terraform ricrei l'istanza se cambia solo user_data (già eseguita al primo avvio)
+  lifecycle {
+    ignore_changes = [user_data]
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Elastic IP — IP pubblico statico che non cambia al riavvio dell'istanza
+# Free tier: 1 EIP gratuito finché associato a un'istanza running
+# ---------------------------------------------------------------------------
+resource "aws_eip" "hopcraft" {
+  instance = aws_instance.hopcraft.id
+  domain   = "vpc"
+
+  tags = {
+    Name = "hopcraft-eip"
+  }
 }

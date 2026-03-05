@@ -6,6 +6,8 @@ resource "aws_security_group" "hopcraft" {
   # Nota: CloudFront usa IP variabili — in produzione si può usare il managed prefix list
   # aws_ec2_managed_prefix_list "cloudfront" ma richiede lookup extra.
   # Per semplicità, 0.0.0.0/0 su 80 è accettabile: il backend non serve dati sensibili.
+
+  
   ingress {
     description = "HTTP (CloudFront to Nginx)"
     from_port   = 80

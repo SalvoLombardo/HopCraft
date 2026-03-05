@@ -1,11 +1,11 @@
 output "ec2_public_ip" {
-  description = "IP pubblico dell'EC2 — da aggiornare nel secret GitHub EC2_HOST"
-  value       = aws_instance.hopcraft.public_ip
+  description = "IP pubblico statico dell'EC2 (Elastic IP) — da impostare nel secret GitHub EC2_HOST"
+  value       = aws_eip.hopcraft.public_ip
 }
 
 output "ec2_public_dns" {
-  description = "DNS pubblico dell'EC2"
-  value       = aws_instance.hopcraft.public_dns
+  description = "DNS pubblico dell'EC2 (Elastic IP)"
+  value       = aws_eip.hopcraft.public_dns
 }
 
 output "cloudfront_url" {

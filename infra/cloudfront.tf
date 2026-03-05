@@ -2,7 +2,7 @@ resource "aws_cloudfront_distribution" "hopcraft" {
   enabled             = true
   default_root_object = "index.html"
   comment             = "HopCraft — SPA + API proxy"
-  price_class         = "PriceClass_100" # Solo Europa + Nord America (free tier compatibile)
+  price_class         = "PriceClass_100" # Only Europa + Nord America ( to stay inside  the free tier )
 
   # ---------------------------------------------------------------------------
   # Origin 1: S3 (React SPA)

@@ -11,7 +11,7 @@ from app.api.v1.router import api_router
 import app.models  # noqa: F401 — registra tutti i modelli con Base
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.DEBUG if settings.app_env == "development" else logging.INFO,
     format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
 )
 
@@ -41,7 +41,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.allowed_origins.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

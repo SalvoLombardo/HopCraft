@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     # App
     app_env: str = "development"
+    allowed_origins: str = "http://localhost:3000"
     cache_ttl_hours: int = 6
     max_airports_search: int = 300
 

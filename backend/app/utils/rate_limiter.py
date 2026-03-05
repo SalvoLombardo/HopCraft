@@ -44,5 +44,3 @@ async def get_remaining(key: str, max_calls: int) -> int:
     count = int(await redis.get(key) or 0)
     return max(0, max_calls - count)
 
-
-#asd
