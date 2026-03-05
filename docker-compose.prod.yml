@@ -27,6 +27,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    # ---------------------------------------------------------------------------
+    # Logging su CloudWatch Logs via driver awslogs (integrato in Docker, no agenti)
+    # Richiede IAM role con CloudWatchLogsFullAccess attaccato all'istanza EC2.
+    # NB: con awslogs attivo, `docker logs backend` non funziona più localmente —
+    # usare la console CloudWatch o Logs Insights per leggere i log.
+    # Log group: hopcraft/backend  |  Log stream: backend
+    # ---------------------------------------------------------------------------
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-south-1
+        awslogs-group: hopcraft/backend
+        awslogs-stream: backend
+        awslogs-create-group: "true"
 
   # ---------------------------------------------------------------------------
   # PostgreSQL

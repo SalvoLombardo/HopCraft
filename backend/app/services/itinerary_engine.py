@@ -9,7 +9,9 @@ Orchestrates the full multi-city search in 5 steps:
   Step 5: return top 5 as SmartMultiOut
 """
 import asyncio
+import json
 import logging
+import time
 from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -167,8 +169,12 @@ async def run_smart_multi(
         SmartMultiOut with the top 5 itineraries sorted by price + provider_status.
     """
 
+    t_start = time.perf_counter()
+
     # ── Step 1: explorable area
+    t1 = time.perf_counter()
     explorable_area_details: AreaResult = await calculate_area(session, origin, trip_duration_days)
+    t_area_ms = int((time.perf_counter() - t1) * 1000)
 
     # ── Cascade provider setup (done before Step 2 to compute the provider_hint)
     providers_in_order = await get_providers_in_order()
@@ -187,6 +193,7 @@ async def run_smart_multi(
     airports_for_llm = explorable_area_details.airports[:_MAX_AIRPORTS_FOR_LLM]
     available_airports = [f"{a.iata_code} ({a.city})" for a in airports_for_llm]
 
+    t2 = time.perf_counter()
     suggestions: list[SuggestedItinerary] = await generate_with_fallback(
         origin=origin,
         duration_days=trip_duration_days,
@@ -196,6 +203,7 @@ async def run_smart_multi(
         available_airports=available_airports,
         provider_hint=provider_hint,
     )
+    t_llm_ms = int((time.perf_counter() - t2) * 1000)
 
     # ── Step 3: real price check (parallel, with concurrency limit)
     semaphore = asyncio.Semaphore(_MAX_CONCURRENT_PRICING)
@@ -205,7 +213,9 @@ async def run_smart_multi(
         )
         for s in suggestions
     ]
+    t3 = time.perf_counter()
     results = await asyncio.gather(*tasks, return_exceptions=True)
+    t_pricing_ms = int((time.perf_counter() - t3) * 1000)
 
     # ── Step 4: budget filtering + ranking
     n_no_data = 0
@@ -225,6 +235,25 @@ async def run_smart_multi(
 
     priced.sort(key=lambda x: x[2])
     top5 = priced[:5]
+
+    total_ms = int((time.perf_counter() - t_start) * 1000)
+    logger.info(json.dumps({
+        "event": "smart_multi_timing",
+        "origin": origin,
+        "trip_duration_days": trip_duration_days,
+        "budget_eur": budget_per_person_eur,
+        "travelers": travelers,
+        "provider": active_provider,
+        "step_area_ms": t_area_ms,
+        "step_llm_ms": t_llm_ms,
+        "step_pricing_ms": t_pricing_ms,
+        "routes_suggested": len(suggestions),
+        "routes_no_data": n_no_data,
+        "routes_over_budget": n_over_budget,
+        "routes_returned": len(top5),
+        "result": "success" if top5 else "no_results",
+        "total_ms": total_ms,
+    }))
 
     if not top5:
         if n_no_data > 0 and n_over_budget == 0:

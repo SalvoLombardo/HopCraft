@@ -13,6 +13,7 @@
 9. [Geo Utilities](#geo-utilities)
 10. [CI/CD Pipeline](#cicd-pipeline)
 11. [Infrastructure (AWS)](#infrastructure-aws)
+12. [Monitoring & Observability](#monitoring--observability)
 
 ---
 
@@ -467,6 +468,88 @@ EC2 t3.micro (docker-compose.prod.yml)
 ```
 
 HTTPS is provided by CloudFront at no cost. The EC2 instance only needs port 80 open (CloudFront → EC2 traffic is plain HTTP over AWS internal network).
+
+---
+
+## Monitoring & Observability
+
+### CloudWatch Logs
+
+Backend logs are shipped to **AWS CloudWatch Logs** via the Docker `awslogs` driver (built into Docker Engine — no agent required).
+
+```
+Log group:  hopcraft/backend
+Log stream: backend
+Region:     eu-south-1
+```
+
+The driver uses the EC2 instance IAM role (`hopcraft-ec2-role`) for credentials via the EC2 metadata service. The role has `CloudWatchLogsFullAccess` attached.
+
+> **Note:** IAM resources are managed manually via the AWS console (root account). The `hopcraft-deploy` Terraform user does not have IAM permissions, so `infra/iam.tf` is documentation-only.
+
+> **Side effect:** with `awslogs` active, `docker logs backend` does not work on the EC2 instance. Use the CloudWatch Logs console or Logs Insights to read logs.
+
+### Structured Timing Logs
+
+`itinerary_engine.py` emits one structured JSON log line per Smart Multi-City request, immediately before returning the response:
+
+```json
+{
+  "event": "smart_multi_timing",
+  "origin": "CTA",
+  "trip_duration_days": 12,
+  "budget_eur": 300.0,
+  "travelers": 1,
+  "provider": "amadeus",
+  "step_area_ms": 87,
+  "step_llm_ms": 4231,
+  "step_pricing_ms": 22847,
+  "routes_suggested": 10,
+  "routes_no_data": 2,
+  "routes_over_budget": 3,
+  "routes_returned": 5,
+  "result": "success",
+  "total_ms": 27165
+}
+```
+
+| Field | Description |
+|---|---|
+| `step_area_ms` | DB query + Haversine filtering (Step 1) |
+| `step_llm_ms` | LLM call (Step 2) — main variable cost |
+| `step_pricing_ms` | Provider pricing, all routes, parallel with semaphore=3 (Step 3) |
+| `routes_suggested` | Number of candidate routes returned by the AI |
+| `routes_no_data` | Routes dropped because the provider returned no flights |
+| `routes_over_budget` | Routes dropped because total price exceeded budget |
+| `routes_returned` | Final itineraries returned to the user (max 5) |
+
+The log is written even when `routes_returned = 0` (before the `ValueError` is raised), so failed requests are also observable.
+
+### CloudWatch Logs Insights Queries
+
+**Recent requests — timing breakdown:**
+```
+fields @timestamp, step_llm_ms, step_pricing_ms, total_ms, routes_suggested, routes_returned
+| filter event = "smart_multi_timing"
+| sort @timestamp desc
+| limit 20
+```
+
+**Average time per step:**
+```
+filter event = "smart_multi_timing"
+| stats avg(step_llm_ms) as avg_llm,
+        avg(step_pricing_ms) as avg_pricing,
+        avg(total_ms) as avg_total,
+        count() as requests
+```
+
+**Requests with low yield (many routes suggested, few returned):**
+```
+filter event = "smart_multi_timing"
+| filter routes_returned < 2 and routes_suggested >= 8
+| fields @timestamp, origin, provider, routes_no_data, routes_over_budget, total_ms
+```
 
 ### Migration Note (June 2026)
 
