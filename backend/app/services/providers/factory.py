@@ -1,17 +1,17 @@
 """
-Flight Provider Factory — cascade automatica SerpAPI → Amadeus.
+Flight Provider Factory — automatic cascade SerpAPI → Amadeus.
 
-get_providers_in_order() interroga Redis per i saldi rimanenti e restituisce
-solo i provider con quota disponibile, nell'ordine prefissato.
+get_providers_in_order() queries Redis for remaining quotas and returns
+only providers with available quota, in the predefined order.
 
-Ogni provider ha una chiave Redis separata (es. "serpapi:monthly") con TTL
-di 30 giorni: il contatore si azzera automaticamente al ciclo successivo.
+Each provider has a separate Redis key (e.g. "serpapi:monthly") with a 30-day TTL:
+the counter resets automatically at the start of the next cycle.
 
-Funzioni esposte:
-  get_providers_in_order() → lista (nome, provider) con quota > 0
-  get_provider_quotas()    → dict {nome: saldo_rimanente} per entrambi
-  PROVIDER_LIMITS          → dict con i limiti mensili (con margine)
-  MONTHLY_WINDOW           → durata della finestra in secondi (30 giorni)
+Exposed functions:
+  get_providers_in_order() → list of (name, provider) with quota > 0
+  get_provider_quotas()    → dict {name: remaining_balance} for both providers
+  PROVIDER_LIMITS          → dict with monthly limits (with safety margin)
+  MONTHLY_WINDOW           → window duration in seconds (30 days)
 """
 from app.config import settings
 from app.services.providers.base import FlightProvider
@@ -19,18 +19,18 @@ from app.services.providers.google_flights import GoogleFlightsProvider
 from app.services.providers.amadeus import AmadeusProvider
 from app.utils.rate_limiter import get_remaining
 
-# Finestra mensile in secondi (usata anche da search_engine e itinerary_engine)
+# Monthly window in seconds (also used by search_engine and itinerary_engine)
 MONTHLY_WINDOW: int = 30 * 24 * 3600
 
-# Limiti mensili con margine di sicurezza (~10%)
-# serpapi:  250 req/mese free tier → limite 230
-# amadeus:  2000 req/mese free tier → limite 1800
+# Monthly limits with safety margin (~10%)
+# serpapi:  250 req/month free tier → limit 230
+# amadeus:  2000 req/month free tier → limit 1800
 PROVIDER_LIMITS: dict[str, int] = {
     "serpapi": 230,
     "amadeus": 1800,
 }
 
-# Note human-readable mostrate nel badge frontend per ogni stato attivo
+# Human-readable notes shown in the frontend badge for each active state
 PROVIDER_NOTES: dict[str, str] = {
     "serpapi": (
         "Results from Google Flights (SerpAPI) — includes Wizz Air, easyJet and more. "
@@ -46,7 +46,7 @@ PROVIDER_NOTES: dict[str, str] = {
 
 
 def _all_providers() -> list[tuple[str, FlightProvider]]:
-    """Costruisce la lista completa nell'ordine cascade."""
+    """Builds the full provider list in cascade order."""
     return [
         ("serpapi", GoogleFlightsProvider()),
         ("amadeus", AmadeusProvider(settings.amadeus_api_key, settings.amadeus_api_secret)),
@@ -55,18 +55,18 @@ def _all_providers() -> list[tuple[str, FlightProvider]]:
 
 async def get_providers_in_order() -> list[tuple[str, FlightProvider]]:
     """
-    Restituisce i provider con quota residua nell'ordine cascade.
+    Returns providers with remaining quota in cascade order.
 
-    Se settings.flight_provider è impostato su un provider noto ("serpapi" o "amadeus"),
-    quel provider viene messo in testa alla lista indipendentemente dall'ordine di default.
-    Utile in sviluppo per forzare Amadeus (più quota) e preservare i crediti SerpAPI.
+    If settings.flight_provider is set to a known provider ("serpapi" or "amadeus"),
+    that provider is moved to the front of the list regardless of the default order.
+    Useful in development to force Amadeus (more quota) and preserve SerpAPI credits.
 
-    Esempio .env:
-        FLIGHT_PROVIDER=amadeus   → ordine [amadeus, serpapi]
-        FLIGHT_PROVIDER=serpapi   → ordine [serpapi, amadeus]  (default)
-        FLIGHT_PROVIDER=cascade   → ordine [serpapi, amadeus]  (cascade automatica)
+    Example .env:
+        FLIGHT_PROVIDER=amadeus   → order [amadeus, serpapi]
+        FLIGHT_PROVIDER=serpapi   → order [serpapi, amadeus]  (default)
+        FLIGHT_PROVIDER=cascade   → order [serpapi, amadeus]  (automatic cascade)
 
-    Se tutti sono esauriti restituisce lista vuota.
+    Returns an empty list if all providers are exhausted.
     """
     ordered = _all_providers()
 
@@ -86,7 +86,7 @@ async def get_providers_in_order() -> list[tuple[str, FlightProvider]]:
 
 
 async def get_provider_quotas() -> dict[str, int]:
-    """Saldo rimanente per ogni provider — incluso nella risposta API."""
+    """Remaining balance per provider — included in the API response."""
     return {
         name: await get_remaining(f"{name}:monthly", limit)
         for name, limit in PROVIDER_LIMITS.items()

@@ -15,7 +15,7 @@ class AirportOut(BaseModel):
     longitude: float
     is_active: bool
 
-    # Permette a Pydantic di leggere i dati direttamente da oggetti SQLAlchemy
+    # Allow to read SQLalch objects
     model_config = {"from_attributes": True}
 
 

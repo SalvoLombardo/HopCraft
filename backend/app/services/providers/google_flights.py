@@ -1,13 +1,13 @@
 """
-GoogleFlightsProvider — provider primario via SerpAPI.
+GoogleFlightsProvider — primary provider via SerpAPI.
 
-SerpAPI espone i dati di Google Flights (incluse le low-cost europee:
-Ryanair, Wizz Air, easyJet) in JSON strutturato senza scraping diretto.
+SerpAPI exposes Google Flights data (including European low-cost carriers:
+Ryanair, Wizz Air, easyJet) as structured JSON without direct scraping.
 
-Free tier: 100 ricerche/mese — sufficiente per sviluppo e demo portfolio.
-Registrazione: https://serpapi.com
+Free tier: 100 searches/month — sufficient for development and portfolio demos.
+Registration: https://serpapi.com
 
-Documentazione endpoint:
+Endpoint documentation:
   https://serpapi.com/google-flights-api
 """
 import asyncio
@@ -20,15 +20,15 @@ from app.services.providers.base import FlightOffer, FlightProvider, Leg
 
 _SERPAPI_URL = "https://serpapi.com/search.json"
 
-# Massimo giorni nel range da cercare in parallelo
+# Maximum number of days in the search range to query in parallel
 _MAX_DAYS_IN_RANGE = 7
 
 
 def _parse_offer(item: dict, origin: str, destination: str) -> FlightOffer | None:
     """
-    Normalizza un'offerta SerpAPI (best_flights o other_flights) in FlightOffer.
+    Normalises a SerpAPI offer (best_flights or other_flights) into a FlightOffer.
 
-    Struttura SerpAPI:
+    SerpAPI structure:
     {
       "flights": [{"departure_airport": {...}, "arrival_airport": {...},
                    "airline": "Ryanair", "duration": 125, ...}],
@@ -46,7 +46,7 @@ def _parse_offer(item: dict, origin: str, destination: str) -> FlightOffer | Non
         last_leg = flights[-1]
 
         departure_time = first_leg.get("departure_airport", {}).get("time", "")
-        # SerpAPI restituisce orari come "2026-04-01 07:15" — li convertiamo in ISO
+        # SerpAPI returns times as "2026-04-01 07:15" — convert to ISO format
         departure_iso = departure_time.replace(" ", "T") if departure_time else ""
 
         return FlightOffer(
@@ -69,7 +69,7 @@ async def _fetch_for_date(
     direct_only: bool,
     max_results: int,
 ) -> list[FlightOffer]:
-    """Chiama SerpAPI per una singola data e restituisce FlightOffer normalizzati."""
+    """Calls SerpAPI for a single date and returns normalised FlightOffer objects."""
     params: dict = {
         "engine": "google_flights",
         "departure_id": origin,
@@ -77,12 +77,12 @@ async def _fetch_for_date(
         "outbound_date": search_date.isoformat(),
         "currency": "EUR",
         "hl": "en",
-        "type": "2",      # 1=andata/ritorno, 2=solo andata
+        "type": "2",      # 1=round-trip, 2=one-way
         "adults": "1",
         "api_key": settings.serpapi_api_key,
     }
     if direct_only:
-        params["stops"] = "0"   # 0=solo diretti, 1=max 1 scalo, 2=qualsiasi
+        params["stops"] = "0"   # 0=direct only, 1=max 1 stop, 2=any
 
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(_SERPAPI_URL, params=params)
@@ -90,7 +90,7 @@ async def _fetch_for_date(
         data = resp.json()
 
     offers: list[FlightOffer] = []
-    # SerpAPI suddivide i risultati in best_flights e other_flights
+    # SerpAPI splits results into best_flights and other_flights
     for section in ("best_flights", "other_flights"):
         for item in data.get(section, []):
             offer = _parse_offer(item, origin, destination)
@@ -112,14 +112,14 @@ class GoogleFlightsProvider(FlightProvider):
         direct_only: bool = False,
         max_results: int = 50,
     ) -> list[FlightOffer]:
-        # Costruisce la lista di date nel range (max _MAX_DAYS_IN_RANGE)
+        # Build the list of dates in the range (max _MAX_DAYS_IN_RANGE)
         dates: list[date] = []
         current = date_from
         while current <= date_to and len(dates) < _MAX_DAYS_IN_RANGE:
             dates.append(current)
             current += timedelta(days=1)
 
-        # Chiamate parallele (una per data)
+        # Parallel calls — one per date
         tasks = [
             _fetch_for_date(origin, destination, d, direct_only, max_results)
             for d in dates
@@ -138,7 +138,7 @@ class GoogleFlightsProvider(FlightProvider):
         self,
         legs: list[Leg],
     ) -> list[FlightOffer]:
-        """Cerca la tratta più economica per ogni leg in parallelo."""
+        """Searches the cheapest offer for each leg in parallel."""
         tasks = [
             _fetch_for_date(leg.origin, leg.destination, leg.date, False, 5)
             for leg in legs

@@ -1,8 +1,8 @@
 """
-LLM Provider Layer — classi astratte e utility condivise.
+LLM Provider Layer — abstract base classes and shared utilities.
 
-Il prompt è definito qui una sola volta: tutti i provider lo ricevono identico,
-garantendo output coerente indipendentemente dal modello usato.
+The prompt is defined once here so that every provider receives
+the exact same input.
 """
 import json
 import logging
@@ -15,14 +15,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SuggestedItinerary:
-    route: list[str]           # es. ["CTA", "ATH", "SOF", "BUD", "CTA"]
+    route: list[str]           # e.g. ["CTA", "ATH", "SOF", "BUD", "CTA"]
     reasoning: str
     estimated_difficulty: str  # "easy" | "medium" | "hard"
-    best_season: list[str]     # es. ["apr", "mag", "giu"]
+    best_season: list[str]     # e.g. ["apr", "may", "jun"]
 
 
 class LLMProvider(ABC):
-
+    # Abstract method enforces a consistent interface across all providers
     @abstractmethod
     async def generate_itineraries(
         self,
@@ -35,44 +35,44 @@ class LLMProvider(ABC):
         provider_hint: str = "",
     ) -> list[SuggestedItinerary]:
         """
-        Genera itinerari multi-città candidati.
+        Generate candidate multi-city itineraries.
 
         Args:
-            origin:              codice IATA aeroporto di partenza/ritorno
-            duration_days:       durata totale viaggio in giorni
-            budget_per_leg:      budget per tratta per persona in EUR
-            season:              stagione di viaggio (es. "estate 2026")
-            num_stops:           numero di tappe intermedie suggerite
-            available_airports:  lista stringhe "IATA (Città)" degli aeroporti nel raggio
+            origin:              IATA code of the departure/return airport
+            duration_days:       total trip duration in days
+            budget_per_leg:      max budget per leg per person in EUR
+            season:              travel season (e.g. "summer 2026")
+            num_stops:           number of intermediate stops to suggest
+            available_airports:  list of "IATA (City)" strings within the search radius
         """
         ...
 
 
 # ---------------------------------------------------------------------------
-# Prompt condiviso — identico per tutti i provider
+# Shared prompt — identical for all providers
 # ---------------------------------------------------------------------------
 
-SYSTEM_PROMPT = """Sei un esperto di viaggi e rotte aeree low-cost in Europa.
-Dato un punto di partenza, una durata, un budget per tratta e una lista
-di aeroporti raggiungibili, genera 8-10 itinerari multi-città ottimizzati.
+SYSTEM_PROMPT = """You are an expert in European travel and low-cost flight routes.
+Given a departure point, a trip duration, a per-leg budget, and a list
+of reachable airports, generate 8-10 optimised multi-city itineraries.
 
-Rispondi SOLO in JSON, senza preambolo né markdown.
-Formato:
+Reply ONLY in JSON, with no preamble or markdown.
+Format:
 [
   {
     "route": ["CTA", "ATH", "SOF", "BUD", "CTA"],
-    "reasoning": "Rotta balcanica con ottime connessioni low-cost",
+    "reasoning": "Balkan route with excellent low-cost connections",
     "estimated_difficulty": "easy",
-    "best_season": ["apr", "mag", "giu", "set", "ott"]
+    "best_season": ["apr", "may", "jun", "sep", "oct"]
   }
 ]
 
-Criteri:
-- Privilegia rotte con connessioni low-cost note (Ryanair, Wizz Air, easyJet)
-- Ogni tappa deve avere senso geografico (no zig-zag)
-- Considera la stagionalità
-- Rispetta il budget per tratta indicato
-- L'ultimo volo deve tornare all'origine"""
+Criteria:
+- Favour routes with well-known low-cost connections (Ryanair, Wizz Air, easyJet)
+- Each stop must make geographic sense (no zig-zagging)
+- Take seasonality into account
+- Stay within the indicated per-leg budget
+- The last flight must return to the origin"""
 
 
 def build_user_prompt(
@@ -86,26 +86,26 @@ def build_user_prompt(
 ) -> str:
     airport_list = ", ".join(available_airports)
     prompt = (
-        f"Origine: {origin}\n"
-        f"Durata viaggio: {duration_days} giorni\n"
-        f"Budget per tratta per persona: {budget_per_leg}€\n"
-        f"Stagione: {season}\n"
-        f"Numero tappe intermedie: {num_stops}\n"
-        f"Aeroporti disponibili nel raggio: {airport_list}"
+        f"Origin: {origin}\n"
+        f"Trip duration: {duration_days} days\n"
+        f"Budget per leg per person: {budget_per_leg}€\n"
+        f"Season: {season}\n"
+        f"Number of intermediate stops: {num_stops}\n"
+        f"Available airports within radius: {airport_list}"
     )
     if provider_hint:
-        prompt += f"\nVincolo provider: {provider_hint}"
+        prompt += f"\nProvider constraint: {provider_hint}"
     return prompt
 
 
 def parse_itineraries(raw: str) -> list[SuggestedItinerary]:
     """
-    Converte la risposta testuale del modello in lista di SuggestedItinerary.
+    Parses the raw model response into a list of SuggestedItinerary objects.
 
-    Gestisce il caso in cui il modello wrappa il JSON in markdown code blocks
-    nonostante le istruzioni (comportamento comune su alcuni provider).
+    Handles cases where the model wraps JSON in markdown code blocks
+    despite instructions (common behaviour on some providers).
     """
-    # Rimuove eventuali ```json ... ``` o ``` ... ```
+    # Strip optional ```json ... ``` or ``` ... ``` wrappers
     match = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
     cleaned = match.group(1).strip() if match else raw.strip()
 
@@ -123,5 +123,5 @@ def parse_itineraries(raw: str) -> list[SuggestedItinerary]:
             )
         return result
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
-        logger.warning("parse_itineraries fallito: %s. Raw (500 chars): %.500s", exc, raw)
-        raise ValueError(f"Risposta LLM non valida: {exc}") from exc
+        logger.warning("parse_itineraries failed: %s. Raw (500 chars): %.500s", exc, raw)
+        raise ValueError(f"Invalid LLM response: {exc}") from exc

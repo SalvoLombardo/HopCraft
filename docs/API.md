@@ -36,6 +36,8 @@ Returns service status.
 
 Returns all active airports in the database.
 
+> **Scope:** Europe + North Africa (Morocco, Tunisia, Egypt). The airport dataset is seeded from [OpenFlights](https://openflights.org/data) and filtered by the `COUNTRY_CONTINENT` mapping in `seed_airports.py`. Adding a country to that mapping and re-running the seed is enough to extend coverage.
+
 **Query parameters**
 
 | Parameter | Type | Default | Description |
@@ -69,13 +71,13 @@ Returns airports within a given radius from a coordinate.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `lat` | float | Yes | Origin latitude |
-| `lon` | float | Yes | Origin longitude |
+| `origin_lat` | float | Yes | Latitude of the origin airport |
+| `origin_lon` | float | Yes | Longitude of the origin airport |
 | `radius_km` | int | Yes | Radius in kilometres |
 
 **Example**
 ```
-GET /api/v1/airports/in-radius?lat=37.47&lon=15.06&radius_km=2000
+GET /api/v1/airports/in-radius?origin_lat=37.47&origin_lon=15.06&radius_km=2000
 ```
 
 **Response `200`**

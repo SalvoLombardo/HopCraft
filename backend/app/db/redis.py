@@ -1,10 +1,10 @@
 """
-Connessione Redis asincrona.
+Asynchronous Redis connection.
 
-Uso come dependency FastAPI:
+Usage as a FastAPI dependency:
     redis = Annotated[aioredis.Redis, Depends(get_redis)]
 
-Oppure direttamente:
+Or directly:
     redis = await get_redis()
 """
 import redis.asyncio as aioredis

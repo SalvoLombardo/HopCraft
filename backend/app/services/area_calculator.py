@@ -1,12 +1,12 @@
 """
-Area Calculator — Step 1 della pipeline Smart Multi-City.
+Area Calculator — Step 1 of the Smart Multi-City pipeline.
 
-Data un'origine e una durata di viaggio:
-  1. Calcola il raggio esplorabile (estimate_radius_km)
-  2. Stima il numero di tappe intermedie (estimate_stops)
-  3. Interroga il DB e filtra gli aeroporti entro quel raggio (Haversine)
+Given an origin and a trip duration:
+  1. Computes the explorable radius (estimate_radius_km)
+  2. Estimates the number of intermediate stops (estimate_stops)
+  3. Queries the DB and filters airports within that radius (Haversine)
 
-Restituisce un AreaResult con tutto il necessario per lo Step 2 (LLM).
+Returns an AreaResult with everything needed for Step 2 (LLM).
 """
 from dataclasses import dataclass
 
@@ -41,21 +41,21 @@ async def calculate_area(
     trip_duration_days: int,
 ) -> AreaResult:
     """
-    Calcola l'area esplorabile per la pipeline Smart Multi-City.
+    Computes the explorable area for the Smart Multi-City pipeline.
 
     Args:
-        session:            sessione DB asincrona
-        origin_iata:        codice IATA dell'aeroporto di partenza/ritorno
-        trip_duration_days: durata totale del viaggio in giorni
+        session:            async DB session
+        origin_iata:        IATA code of the departure/return airport
+        trip_duration_days: total trip duration in days
 
     Returns:
-        AreaResult con raggio, numero tappe e lista aeroporti raggiungibili
-        (esclude l'origine stessa, ordinati per distanza crescente).
+        AreaResult with radius, number of stops, and list of reachable airports
+        (origin excluded, sorted by distance ascending).
 
     Raises:
-        ValueError: se l'aeroporto di origine non esiste nel DB o non è attivo.
+        ValueError: if the origin airport does not exist in the DB or is inactive.
     """
-    # Recupera le coordinate dell'origine
+    # Fetch the coordinates of the origin airport
     result = await session.execute(
         select(Airport).where(
             Airport.iata_code == origin_iata,
@@ -64,12 +64,12 @@ async def calculate_area(
     )
     origin = result.scalar_one_or_none()
     if origin is None:
-        raise ValueError(f"Aeroporto di origine '{origin_iata}' non trovato o non attivo.")
+        raise ValueError(f"Origin airport '{origin_iata}' not found or inactive.")
 
     radius_km = estimate_radius_km(trip_duration_days)
     num_stops = estimate_stops(trip_duration_days)
 
-    # Carica tutti gli aeroporti attivi (esclusa l'origine)
+    # Load all active airports (excluding the origin)
     all_result = await session.execute(
         select(Airport).where(
             Airport.is_active.is_(True),
@@ -78,7 +78,7 @@ async def calculate_area(
     )
     all_airports = all_result.scalars().all()
 
-    # Filtra per raggio e costruisce la lista con distanza
+    # Filter by radius and build the list with distances
     reachable: list[ReachableAirport] = []
     for airport in all_airports:
         dist = haversine_km(origin.latitude, origin.longitude, airport.latitude, airport.longitude)

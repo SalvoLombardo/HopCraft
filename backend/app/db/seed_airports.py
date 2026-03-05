@@ -1,8 +1,15 @@
 """
-This will populate the table airports with eu airports frm OpenFlight
+Populates the airports table with data from OpenFlights (airports.dat).
 
-CMD=docker compose exec backend python -m app.db.seed_airports
+Geographic scope: Europe + North Africa (Morocco, Tunisia, Egypt).
+Filtering is driven by COUNTRY_CONTINENT: only mapped countries are
+inserted into the DB. Adding a country to that dict is enough to extend
+coverage — no other code changes are needed.
+
+CMD: docker compose exec backend python -m app.db.seed_airports
 """
+
+
 import asyncio
 import csv
 import io
@@ -17,10 +24,10 @@ AIRPORTS_URL = (
     "https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat"
 )
 
-# Mapping paese → codice continente ISO (EU, AF, AS, NA, SA, OC)
-# Copre tutti i paesi presenti nel seed attuale.
+# Maps country name → ISO continent code (EU, AF, AS, NA, SA, OC).
+# Only countries listed here will be loaded into the DB.
 COUNTRY_CONTINENT: dict[str, str] = {
-    # Europa
+    # Europe
     "Albania": "EU", "Andorra": "EU", "Austria": "EU", "Belarus": "EU",
     "Belgium": "EU", "Bosnia and Herzegovina": "EU", "Bulgaria": "EU",
     "Croatia": "EU", "Cyprus": "EU", "Czech Republic": "EU", "Denmark": "EU",
@@ -34,16 +41,16 @@ COUNTRY_CONTINENT: dict[str, str] = {
     "Slovakia": "EU", "Slovenia": "EU", "Spain": "EU", "Sweden": "EU",
     "Switzerland": "EU", "Turkey": "EU", "Ukraine": "EU",
     "United Kingdom": "EU", "Vatican City": "EU",
-    # Nord Africa — destinazioni comuni low-cost europee
+    # North Africa — common low-cost destinations from Europe
     "Morocco": "AF", "Tunisia": "AF", "Egypt": "AF",
 }
 
-# Paesi inclusi nel seed (chiavi del mapping sopra)
+# Set of all countries included in the seed (keys of the mapping above)
 EUROPEAN_COUNTRIES = set(COUNTRY_CONTINENT.keys())
 
 
 async def seed() -> None:
-    print("Download airports.dat da OpenFlights...")
+    print("Downloading airports.dat from OpenFlights...")
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(AIRPORTS_URL)
         resp.raise_for_status()
@@ -83,10 +90,10 @@ async def seed() -> None:
         )
 
     if not rows:
-        print("ATTENZIONE: nessun aeroporto trovato. Controllare il CSV.")
+        print("WARNING: no airports found. Check the CSV source.")
         return
 
-    print(f"Trovati {len(rows)} aeroporti europei. Inserimento nel DB...")
+    print(f"Found {len(rows)} airports. Inserting into DB...")
 
     async with async_session_maker() as session:
         stmt = insert(Airport).values(rows)
@@ -97,7 +104,7 @@ async def seed() -> None:
         await session.execute(stmt)
         await session.commit()
 
-    print(f"Seed completato: {len(rows)} aeroporti aggiornati/inseriti.")
+    print(f"Seed complete: {len(rows)} airports inserted/updated.")
 
 
 if __name__ == "__main__":

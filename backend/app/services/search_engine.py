@@ -1,18 +1,18 @@
 """
-Core logic per la Reverse Search.
+Core logic for Reverse Search.
 
-Flusso:
-  1. Query efficiente in batch: trova tutte le cache entries valide per
-     (qualsiasi_origine → destination) nelle date richieste.
-  2. Per gli aeroporti senza cache, chiama i provider in ordine cascade
-     (SerpAPI → Amadeus) fino al primo che risponde con risultati.
-     Massimo _MAX_NEW_CALLS_PER_SEARCH aeroporti per ricerca.
-  3. Salva i nuovi risultati in cache.
-  4. Restituisce lista arricchita con coordinate aeroporto + metadati provider.
+Flow:
+  1. Efficient batch query: finds all valid cache entries for
+     (any_origin → destination) on the requested dates.
+  2. For airports with no cache hit, calls providers in cascade order
+     (SerpAPI → Amadeus) until one returns results.
+     Maximum _MAX_NEW_CALLS_PER_SEARCH airports per search.
+  3. Saves new results to cache.
+  4. Returns an enriched list with airport coordinates + provider metadata.
 
-Rate limit mensile gestito via Redis: chiave separata per provider
-(serpapi:monthly, amadeus:monthly). I limiti e la finestra
-temporale sono centralizzati in providers/factory.py (PROVIDER_LIMITS, MONTHLY_WINDOW).
+Monthly rate limiting is managed via Redis: separate key per provider
+(serpapi:monthly, amadeus:monthly). Limits and the time window
+are centralised in providers/factory.py (PROVIDER_LIMITS, MONTHLY_WINDOW).
 """
 import asyncio
 import logging
@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings  # noqa: F401 — tenuto per compatibilità import esistenti
+from app.config import settings  # noqa: F401 — kept for existing import compatibility
 from app.models.airport import Airport
 from app.models.flight_cache import FlightCache
 from app.db.cache import save_to_cache
@@ -39,7 +39,7 @@ from app.utils.rate_limiter import check_rate_limit
 
 logger = logging.getLogger(__name__)
 
-# Nuove chiamate al provider massime per singola ricerca
+# Maximum new provider calls per single search
 _MAX_NEW_CALLS_PER_SEARCH = 50
 
 
@@ -60,17 +60,17 @@ async def reverse_search(
     radius_km: int | None = None,
 ) -> tuple[list[dict], bool, datetime, ProviderStatus]:
     """
-    Reverse search: trova i voli più economici verso destination da tutti gli aeroporti attivi.
+    Reverse search: finds the cheapest flights to destination from all active airports.
 
-    Parametri opzionali di filtraggio geografico:
-        origin_lat / origin_lon / radius_km — restringe la ricerca agli aeroporti
-        entro radius_km dal punto indicato.
+    Optional geographic filter parameters:
+        origin_lat / origin_lon / radius_km — restricts the search to airports
+        within radius_km of the given point.
 
     Returns:
-        (lista risultati, all_from_cache, fetched_at, provider_status)
+        (results list, all_from_cache, fetched_at, provider_status)
     """
 
-    # --- 1. Carica tutti gli aeroporti attivi (esclusa la destinazione stessa)
+    # --- 1. Load all active airports (excluding the destination itself)
     stmt_airports = select(Airport).where(
         Airport.is_active.is_(True),
         Airport.iata_code != destination,
@@ -79,7 +79,7 @@ async def reverse_search(
     airports: list[Airport] = list(airport_rows.scalars().all())
     airport_map: dict[str, Airport] = {a.iata_code: a for a in airports}
 
-    # --- 1b. Filtraggio per raggio geografico (opzionale)
+    # --- 1b. Optional geographic radius filter
     if origin_lat is not None and origin_lon is not None and radius_km is not None:
         airport_map = {
             code: airport
@@ -143,7 +143,7 @@ async def reverse_search(
                 if not offers:
                     continue
 
-                # Salva in cache per data
+                # Save to cache per date
                 for single_date in date_list:
                     day_offers = [
                         o for o in offers
@@ -152,14 +152,14 @@ async def reverse_search(
                     if day_offers:
                         await save_to_cache(session, origin, destination, single_date, day_offers)
                 fresh_best[origin] = min(offers, key=lambda o: o.price_eur)
-                return  # provider ha risposto: non provare i successivi
+                return  # provider responded: skip remaining providers
 
             except Exception as exc:
                 logger.warning(
-                    "Provider %s %s→%s fallito: %s: %s",
+                    "Provider %s %s→%s failed: %s: %s",
                     provider_name, origin, destination, type(exc).__name__, exc,
                 )
-                continue  # prova il provider successivo
+                continue  # try the next provider
 
     await asyncio.gather(*[_fetch(o) for o in missing_origins])
 

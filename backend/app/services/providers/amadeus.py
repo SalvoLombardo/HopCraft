@@ -1,20 +1,20 @@
 """
-AmadeusProvider — provider primario (API ufficiale, stabile).
+AmadeusProvider — primary provider (official API, stable).
 
-Usa l'Amadeus Self-Service API (free tier: 2.000 richieste/mese).
-LIMITAZIONE: il free tier NON include le compagnie low-cost europee
-(Ryanair, Wizz Air, easyJet). Copre le major carriers (Lufthansa,
-Air France, Iberia, British Airways, Alitalia, ecc.).
+Uses the Amadeus Self-Service API (free tier: 2,000 requests/month).
+LIMITATION: the free tier does NOT include European low-cost carriers
+(Ryanair, Wizz Air, easyJet). Covers major carriers only (Lufthansa,
+Air France, Iberia, British Airways, etc.).
 
-Ottimizzazione token: il token OAuth2 (valido ~30 min) è cachato a livello
-di modulo per evitare una POST /oauth2/token extra ad ogni ricerca.
-Il lock asincrono (_TOKEN_LOCK) serializza le richieste di token concorrenti
-evitando burst multipli verso l'endpoint auth.
+Token optimisation: the OAuth2 token (valid ~30 min) is cached at module
+level to avoid an extra POST /oauth2/token on every search.
+The async lock (_TOKEN_LOCK) serialises concurrent token requests,
+preventing burst calls to the auth endpoint.
 
-Rate limiting: l'API test Amadeus ha un limite di ~10 req/sec. In caso di
-HTTP 429 la search_one_way ritenta con backoff esponenziale (1s, 2s, 4s).
+Rate limiting: the Amadeus test API has a limit of ~10 req/sec. On HTTP 429
+search_one_way retries with exponential backoff (1s, 2s, 4s).
 
-Documentazione: https://developers.amadeus.com/self-service/category/flights
+Documentation: https://developers.amadeus.com/self-service/category/flights
 """
 import asyncio
 import logging
@@ -31,23 +31,23 @@ logger = logging.getLogger(__name__)
 _AUTH_URL = "https://test.api.amadeus.com/v1/security/oauth2/token"
 _SEARCH_URL = "https://test.api.amadeus.com/v2/shopping/flight-offers"
 
-# Cache token a livello di modulo: api_key → (token, expires_at_monotonic)
+# Module-level token cache: api_key → (token, expires_at_monotonic)
 _TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 
-# Lock per serializzare le richieste di token concorrenti (lazy init).
-# Evita che N task paralleli richiedano tutti il token contemporaneamente.
+# Lock to serialise concurrent token requests (lazy init).
+# Prevents N parallel tasks from all requesting a token at the same time.
 _TOKEN_LOCK: asyncio.Lock | None = None
 
 
 def _parse_iso_duration(duration: str) -> int:
-    """Converte durata ISO 8601 'PT2H30M' in minuti totali."""
+    """Converts ISO 8601 duration 'PT2H30M' to total minutes."""
     hours = int(re.search(r"(\d+)H", duration).group(1)) if "H" in duration else 0
     mins = int(re.search(r"(\d+)M", duration).group(1)) if "M" in duration else 0
     return hours * 60 + mins
 
 
 def _parse_offer(item: dict) -> FlightOffer | None:
-    """Normalizza un'offerta Amadeus nel formato FlightOffer."""
+    """Normalises an Amadeus offer into a FlightOffer."""
     try:
         itinerary = item["itineraries"][0]
         segments = itinerary["segments"]
@@ -74,10 +74,10 @@ class AmadeusProvider(FlightProvider):
         self.api_secret = api_secret
 
     async def _get_token(self, client: httpx.AsyncClient) -> str:
-        """Restituisce un token OAuth2 valido, usando la cache se disponibile.
+        """Returns a valid OAuth2 token, using the cache when available.
 
-        Il lock serializza le richieste concorrenti: solo il primo task chiama
-        l'endpoint auth, gli altri attendono e poi trovano il token in cache.
+        The lock serialises concurrent requests: only the first task calls
+        the auth endpoint; the others wait and then find the token in cache.
         """
         global _TOKEN_LOCK
         if _TOKEN_LOCK is None:
@@ -86,7 +86,7 @@ class AmadeusProvider(FlightProvider):
         async with _TOKEN_LOCK:
             now = time.monotonic()
             cached = _TOKEN_CACHE.get(self.api_key)
-            if cached and now < cached[1] - 60:   # 60s di margine prima della scadenza
+            if cached and now < cached[1] - 60:   # 60s safety margin before expiry
                 return cached[0]
 
             resp = await client.post(
@@ -114,16 +114,16 @@ class AmadeusProvider(FlightProvider):
         direct_only: bool = False,
         max_results: int = 50,
     ) -> list[FlightOffer]:
-        """Cerca voli one-way con retry automatico su HTTP 429 (backoff 1s, 2s, 4s)."""
-        # Amadeus non supporta range di date nativamente:
-        # si usa date_from come data di partenza principale
+        """Searches one-way flights with automatic retry on HTTP 429 (backoff 1s, 2s, 4s)."""
+        # Amadeus does not natively support date ranges:
+        # date_from is used as the primary departure date
         params: dict = {
             "originLocationCode": origin,
             "destinationLocationCode": destination,
             "departureDate": date_from.isoformat(),
             "adults": 1,
             "currencyCode": "EUR",
-            "max": min(max_results, 250),  # Amadeus max è 250
+            "max": min(max_results, 250),  # Amadeus max is 250
         }
         if direct_only:
             params["nonStop"] = "true"
@@ -137,10 +137,10 @@ class AmadeusProvider(FlightProvider):
                         params=params,
                         headers={"Authorization": f"Bearer {token}"},
                     )
-                # client chiuso qui — resp.json() resta accessibile (body già letto da httpx)
+                # client closed here — resp.json() still accessible (body already read by httpx)
             except httpx.TimeoutException:
                 logger.warning(
-                    "Amadeus %s→%s %s: timeout (tentativo %d/3)",
+                    "Amadeus %s→%s %s: timeout (attempt %d/3)",
                     origin, destination, date_from, attempt + 1,
                 )
                 if attempt == 2:
@@ -150,7 +150,7 @@ class AmadeusProvider(FlightProvider):
             if resp.status_code == 429:
                 wait = 2 ** attempt  # 1s, 2s, 4s
                 logger.warning(
-                    "Amadeus %s→%s %s: HTTP 429 (tentativo %d/3), retry in %ds",
+                    "Amadeus %s→%s %s: HTTP 429 (attempt %d/3), retrying in %ds",
                     origin, destination, date_from, attempt + 1, wait,
                 )
                 await asyncio.sleep(wait)
@@ -173,7 +173,7 @@ class AmadeusProvider(FlightProvider):
             return [o for o in offers if o is not None]
 
         logger.warning(
-            "Amadeus %s→%s %s: HTTP 429 dopo 3 tentativi, tratta saltata",
+            "Amadeus %s→%s %s: HTTP 429 after 3 attempts, leg skipped",
             origin, destination, date_from,
         )
         return []
@@ -182,7 +182,7 @@ class AmadeusProvider(FlightProvider):
         self,
         legs: list[Leg],
     ) -> list[FlightOffer]:
-        """Cerca sequenzialmente ogni tratta e restituisce la più economica per leg."""
+        """Searches each leg sequentially and returns the cheapest offer per leg."""
         result: list[FlightOffer] = []
         for leg in legs:
             leg_offers = await self.search_one_way(

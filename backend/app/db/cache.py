@@ -1,13 +1,13 @@
 """
-Cache layer per i risultati di volo (PostgreSQL flight_cache).
+Cache layer for flight results (PostgreSQL flight_cache).
 
-Flusso di utilizzo:
-    1. get_cached()  → hit? restituisce (offerte, fetched_at) senza chiamare il provider
-    2. save_to_cache() → dopo ogni chiamata al provider, salva i risultati
-    3. Il TTL è definito da CACHE_TTL_HOURS nel .env (default 6h)
+flow:
+    1. get_cached()  → hit? returns (offers, fetched_at) without calling the provider
+    2. save_to_cache() → after each provider call, saves the results
+    3. TTL is defined by CACHE_TTL_HOURS in the .env file (default 6h)
 
-La tabella flight_cache ha UNIQUE su (origin, destination, departure_date):
-ogni tuple ha un solo record, aggiornato in-place quando la cache scade.
+The flight_cache table has a UNIQUE constraint on (origin, destination, departure_date):
+each tuple has only one record, updated in-place when the cache expires.
 """
 from dataclasses import asdict
 from datetime import date, datetime, timedelta, timezone

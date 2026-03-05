@@ -1,8 +1,8 @@
 """
-Flight Provider Layer — interfaccia astratta (Strategy Pattern).
+Flight Provider Layer — abstract interface (Strategy Pattern).
 
-Il codice applicativo (search_engine, itinerary_engine) usa solo queste classi.
-Il provider concreto viene scelto dalla factory tramite FLIGHT_PROVIDER nel .env.
+Application code (search_engine, itinerary_engine) depends only on these classes.
+The concrete provider is selected by the factory based on FLIGHT_PROVIDER in .env.
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -11,18 +11,18 @@ from datetime import date
 
 @dataclass
 class Leg:
-    """Una singola tratta per la ricerca multi-city."""
-    origin: str       # codice IATA (es. "CTA")
-    destination: str  # codice IATA (es. "ATH")
+    """A single leg for multi-city search."""
+    origin: str       # IATA code (e.g. "CTA")
+    destination: str  # IATA code (e.g. "ATH")
     date: date
 
 
 @dataclass
 class FlightOffer:
-    """Risultato normalizzato indipendente dal provider."""
+    """Normalised flight result, provider-agnostic."""
     origin: str
     destination: str
-    departure: str          # ISO datetime string (es. "2025-04-03T06:30:00")
+    departure: str          # ISO datetime string (e.g. "2025-04-03T06:30:00")
     price_eur: float
     airline: str
     direct: bool
@@ -42,8 +42,8 @@ class FlightProvider(ABC):
         max_results: int = 50,
     ) -> list[FlightOffer]:
         """
-        Cerca voli one-way da origin a destination nel range di date.
-        Restituisce lista di FlightOffer ordinata per prezzo crescente.
+        Search one-way flights from origin to destination within the date range.
+        Returns a list of FlightOffer sorted by price ascending.
         """
         ...
 
@@ -53,7 +53,7 @@ class FlightProvider(ABC):
         legs: list[Leg],
     ) -> list[FlightOffer]:
         """
-        Cerca voli per ogni tratta di un itinerario multi-city.
-        Restituisce una FlightOffer per ogni tratta (la più economica trovata).
+        Search flights for each leg of a multi-city itinerary.
+        Returns one FlightOffer per leg (the cheapest found).
         """
         ...

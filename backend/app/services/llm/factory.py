@@ -1,12 +1,13 @@
 """
-LLM Provider Factory — fallback automatico tra provider.
+LLM Provider Factory — automatic fallback between providers
 
-Ordine: Gemini (primario) → Groq (fallback veloce) → Mistral (fallback volume).
-Se il provider configurato in LLM_PROVIDER fallisce (es. 429 rate limit o errore rete),
-la factory tenta automaticamente il successivo nell'ordine fino ad esaurirli.
+I decided to use a strategy pattern, the code will call only generate_with_fallback()
+but he doesn't know witch provider he's using.
 
-Il codice applicativo chiama solo generate_with_fallback() — non sa quale
-provider sta usando (Strategy Pattern).
+I created an order wich will be Gemini (primary) → Groq (fallback) → Mistral (fallback).
+If the provider doesn't work (for example rate limit)
+the factory will call the nex provider until there's no one to call
+
 """
 import logging
 
@@ -37,15 +38,15 @@ async def generate_with_fallback(
     provider_hint: str = "",
 ) -> list[SuggestedItinerary]:
     """
-    Tenta il provider configurato in LLM_PROVIDER; in caso di errore scala ai fallback.
+    Attempts the provider configured in LLM_PROVIDER; if it fails, falls back to the backup providers.
 
     Args:
-        provider_hint: vincolo opzionale per il prompt (es. restrizioni del flight provider attivo).
-                       Stringa vuota = nessun vincolo aggiuntivo.
+    provider_hint: optional constraint for the prompt (e.g., restrictions of the active flight provider).
+                   Empty string = no additional constraint.
 
     Raises:
-        RuntimeError: se tutti i provider falliscono.
-    """
+        RuntimeError: if all providers fail.
+"""
     start = _FALLBACK_ORDER.index(settings.llm_provider)
 
     for name in _FALLBACK_ORDER[start:]:
@@ -61,7 +62,7 @@ async def generate_with_fallback(
                 provider_hint=provider_hint,
             )
         except Exception as exc:
-            logger.warning("LLM provider '%s' fallito: %s: %s", name, type(exc).__name__, exc)
+            logger.warning("LLM provider '%s' failed: %s: %s", name, type(exc).__name__, exc)
             continue
 
-    raise RuntimeError("Tutti i provider LLM hanno fallito.")
+    raise RuntimeError("None of the LLM providers are working.")

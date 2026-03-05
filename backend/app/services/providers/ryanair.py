@@ -1,16 +1,16 @@
 """
-RyanairProvider — fallback 1 nella cascade flight provider.
+RyanairProvider — fallback 1 in the flight provider cascade.
 
-Usa la libreria Flyan (PyPI) che chiama direttamente gli endpoint non ufficiali
-di Ryanair senza richiedere API key. Copre esclusivamente le rotte Ryanair.
+Uses the Flyan library (PyPI) which calls Ryanair's unofficial endpoints
+directly without requiring an API key. Covers Ryanair routes only.
 
-Vantaggi: nessuna quota mensile dichiarata, attivamente mantenuto (lug 2025).
-Limiti: solo Ryanair, endpoint non ufficiali (rischio ToS, possibile instabilità).
+Advantages: no declared monthly quota, actively maintained (Jul 2025).
+Limitations: Ryanair only, unofficial endpoints (ToS risk, possible instability).
 
-Nota: Flyan è una libreria sincrona → le chiamate vengono eseguite in un thread
-pool separato via asyncio.to_thread() per non bloccare l'event loop.
+Note: Flyan is a synchronous library — calls are run in a thread pool
+via asyncio.to_thread() to avoid blocking the event loop.
 
-Documentazione: https://pypi.org/project/Flyan/
+Documentation: https://pypi.org/project/Flyan/
 """
 import asyncio
 import logging
@@ -22,14 +22,14 @@ from app.services.providers.base import FlightOffer, FlightProvider, Leg
 
 logger = logging.getLogger(__name__)
 
-# Istanza riusabile (thread-safe per letture concorrenti)
+# Reusable instance (thread-safe for concurrent reads)
 _client = RyanAir(currency="EUR")
 
 
 def _sync_search(
     origin: str, destination: str, date_from: date, date_to: date
 ) -> list[FlightOffer]:
-    """Chiama Flyan in modo sincrono e normalizza i risultati in FlightOffer."""
+    """Calls Flyan synchronously and normalises results into FlightOffer objects."""
     params = FlightSearchParams(
         from_airport=origin,
         to_airport=destination,
@@ -51,11 +51,11 @@ def _sync_search(
                 departure=dep_iso,
                 price_eur=float(f.price),
                 airline="Ryanair",
-                direct=True,   # Ryanair non offre voli con scalo tramite questa API
+                direct=True,   # Ryanair does not offer connecting flights via this API
                 duration_minutes=duration,
             ))
         except Exception as exc:
-            logger.debug("RyanairProvider: errore parsing volo: %s", exc)
+            logger.debug("RyanairProvider: error parsing flight: %s", exc)
             continue
 
     return offers
@@ -84,7 +84,7 @@ class RyanairProvider(FlightProvider):
         return offers[:max_results]
 
     async def search_multi_city(self, legs: list[Leg]) -> list[FlightOffer]:
-        """Cerca la tratta più economica per ogni leg in modo sequenziale."""
+        """Searches the cheapest offer for each leg sequentially."""
         result: list[FlightOffer] = []
         for leg in legs:
             leg_offers = await self.search_one_way(
