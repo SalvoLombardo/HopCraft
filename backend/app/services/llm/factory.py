@@ -38,10 +38,10 @@ async def generate_with_fallback(
     provider_hint: str = "",
 ) -> list[SuggestedItinerary]:
     """
-    Attempts the provider configured in LLM_PROVIDER; if it fails, falls back to the backup providers.
+    Attempts the provider configured in LLM_PROVIDER; if it fails, falls back to backup providers.
 
     Args:
-    provider_hint: optional constraint for the prompt (e.g., restrictions of the active flight provider).
+    provider_hint: optional constraint for the prompt (e.g., restrictions of the active provider).
                    Empty string = no additional constraint.
 
     Raises:

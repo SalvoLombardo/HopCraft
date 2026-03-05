@@ -44,7 +44,7 @@ async def search_reverse(
         float | None, Query(ge=-180, le=180, description="Longitudine of the departure area")
     ] = None,
     radius_km: Annotated[
-        int | None, Query(ge=50, le=5000, description="radius in kilometers from the departure area")
+        int | None, Query(ge=50, le=5000, description="radius in km from the departure area")
     ] = None,
 ) -> ReverseSearchOut:
     

@@ -35,8 +35,12 @@ async def list_airports(session: SessionDep) -> list[AirportOut]:
 @router.get("/in-radius", response_model=list[AirportNearbyOut])
 async def airports_in_radius(
     session: SessionDep,
-    origin_lat: Annotated[float, Query(ge=-90, le=90, description="Latitude of the origin airport")],
-    origin_lon: Annotated[float, Query(ge=-180, le=180, description="longitude of the origin airport")],
+    origin_lat: Annotated[
+        float, Query(ge=-90, le=90, description="Latitude of the origin airport")
+    ],
+    origin_lon: Annotated[
+        float, Query(ge=-180, le=180, description="longitude of the origin airport")
+    ],
     radius_km: Annotated[int, Query(ge=1, le=10000, description="Radius in km")] = 2000,
 ) -> list[AirportNearbyOut]:
     """
@@ -49,8 +53,10 @@ async def airports_in_radius(
 
     nearby: list[AirportNearbyOut] = []
     for airport in all_airports:
-        #checking if current airport is in the radius of th origin airport (where the travel is based)
-        dist = haversine_km(origin_lat, origin_lon, float(airport.latitude), float(airport.longitude))
+        # checking if current airport is in the radius of the origin airport
+        dist = haversine_km(
+            origin_lat, origin_lon, float(airport.latitude), float(airport.longitude)
+        )
         if dist <= radius_km:
             nearby.append(
                 AirportNearbyOut(

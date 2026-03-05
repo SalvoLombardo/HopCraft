@@ -231,7 +231,7 @@ async def run_smart_multi(
             raise ValueError(
                 f"The flight provider found no flights for the AI-suggested routes "
                 f"({n_no_data} itineraries without coverage). "
-                "Try different dates, an origin with more connections, or switch the flight provider."
+                "Try different dates, an origin with more connections, or switch provider."
             )
         if n_over_budget > 0 and n_no_data == 0:
             raise ValueError(
