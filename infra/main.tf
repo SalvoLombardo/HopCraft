@@ -29,6 +29,12 @@ terraform {
 provider "aws" {
   region = var.aws_region
 
+  # eu-south-1 regional STS endpoint may not be active in all accounts;
+  # use the global endpoint to avoid "no such host" errors.
+  endpoints {
+    sts = "https://sts.amazonaws.com"
+  }
+
   default_tags {
     tags = {
       Project     = "hopcraft"
