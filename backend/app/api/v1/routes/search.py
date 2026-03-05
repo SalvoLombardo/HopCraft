@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date, datetime
 from typing import Annotated
 
@@ -124,15 +125,26 @@ async def search_smart_multi(
 
 
     try:
-        result = await run_smart_multi(
-            session=session,
-            origin=body.origin.upper(),
-            trip_duration_days=body.trip_duration_days,
-            budget_per_person_eur=body.budget_per_person_eur,
-            travelers=body.travelers,
-            date_from=body.date_from,
-            date_to=body.date_to,
-            direct_only=body.direct_only,
+        result = await asyncio.wait_for(
+            run_smart_multi(
+                session=session,
+                origin=body.origin.upper(),
+                trip_duration_days=body.trip_duration_days,
+                budget_per_person_eur=body.budget_per_person_eur,
+                travelers=body.travelers,
+                date_from=body.date_from,
+                date_to=body.date_to,
+                direct_only=body.direct_only,
+            ),
+            timeout=55,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "La ricerca ha impiegato troppo tempo. "
+                "Riprova tra qualche secondo — i provider di voli sono temporaneamente lenti."
+            ),
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

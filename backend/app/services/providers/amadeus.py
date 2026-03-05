@@ -38,6 +38,19 @@ _TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 # Prevents N parallel tasks from all requesting a token at the same time.
 _TOKEN_LOCK: asyncio.Lock | None = None
 
+# Global semaphore: caps total concurrent Amadeus search_one_way calls across
+# all itineraries. Amadeus free tier allows ~10 req/s; keep well below to
+# avoid 429 cascades that trigger exponential backoff and bust the 60s budget.
+_MAX_CONCURRENT_AMADEUS_CALLS = 5
+_AMADEUS_SEMAPHORE: asyncio.Semaphore | None = None
+
+
+def _get_amadeus_semaphore() -> asyncio.Semaphore:
+    global _AMADEUS_SEMAPHORE
+    if _AMADEUS_SEMAPHORE is None:
+        _AMADEUS_SEMAPHORE = asyncio.Semaphore(_MAX_CONCURRENT_AMADEUS_CALLS)
+    return _AMADEUS_SEMAPHORE
+
 
 def _parse_iso_duration(duration: str) -> int:
     """Converts ISO 8601 duration 'PT2H30M' to total minutes."""
@@ -130,13 +143,14 @@ class AmadeusProvider(FlightProvider):
 
         for attempt in range(3):
             try:
-                async with httpx.AsyncClient(timeout=30) as client:
-                    token = await self._get_token(client)
-                    resp = await client.get(
-                        _SEARCH_URL,
-                        params=params,
-                        headers={"Authorization": f"Bearer {token}"},
-                    )
+                async with _get_amadeus_semaphore():
+                    async with httpx.AsyncClient(timeout=30) as client:
+                        token = await self._get_token(client)
+                        resp = await client.get(
+                            _SEARCH_URL,
+                            params=params,
+                            headers={"Authorization": f"Bearer {token}"},
+                        )
                 # client closed here — resp.json() still accessible (body already read by httpx)
             except httpx.TimeoutException:
                 logger.warning(

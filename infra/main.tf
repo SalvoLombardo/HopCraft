@@ -30,10 +30,8 @@ provider "aws" {
   region = var.aws_region
 
   # eu-south-1 regional STS endpoint may not be active in all accounts;
-  # use the global endpoint to avoid "no such host" errors.
-  endpoints {
-    sts = "https://sts.amazonaws.com"
-  }
+  # route credential validation through us-east-1 (always available).
+  sts_region = "us-east-1"
 
   default_tags {
     tags = {
