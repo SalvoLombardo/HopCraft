@@ -15,7 +15,7 @@ HopCraft solves two problems no mainstream flight aggregator addresses well:
 
 <div align="center">
 
-### ▶ [Watch the 2-minute demo](YOUR_VIDEO_URL_HERE)
+### ▶ [Watch the 2-minute demo](https://www.linkedin.com/posts/salvo-lombardo_hi-in-the-past-few-weeks-ive-been-working-ugcPost-7435751911275827200-Z_xv?utm_source=share&utm_medium=member_ios&rcm=ACoAAE5CKlgBgeWzwZ_yF3GSZ8lanRZ-oJnRwXE)
 
 [![Demo Video](https://img.shields.io/badge/▶%20Watch%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white&labelColor=282828)](YOUR_VIDEO_URL_HERE)
 
