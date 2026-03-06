@@ -11,9 +11,10 @@ class Settings(BaseSettings):
 
     # Flight Provider
     flight_provider: str = "amadeus"
-    serpapi_api_key: str = ""          
+    serpapi_api_key: str = ""
     amadeus_api_key: str = ""
     amadeus_api_secret: str = ""
+    apify_api_token: str = ""
 
     # LLM Provider
     llm_provider: str = "gemini"

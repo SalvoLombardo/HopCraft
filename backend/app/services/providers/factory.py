@@ -1,5 +1,5 @@
 """
-Flight Provider Factory — automatic cascade SerpAPI → Amadeus.
+Flight Provider Factory — automatic cascade SerpAPI → Amadeus → Apify.
 
 get_providers_in_order() queries Redis for remaining quotas and returns
 only providers with available quota, in the predefined order.
@@ -9,7 +9,7 @@ the counter resets automatically at the start of the next cycle.
 
 Exposed functions:
   get_providers_in_order() → list of (name, provider) with quota > 0
-  get_provider_quotas()    → dict {name: remaining_balance} for both providers
+  get_provider_quotas()    → dict {name: remaining_balance} for all providers
   PROVIDER_LIMITS          → dict with monthly limits (with safety margin)
   MONTHLY_WINDOW           → window duration in seconds (30 days)
 """
@@ -17,6 +17,7 @@ from app.config import settings
 from app.services.providers.base import FlightProvider
 from app.services.providers.google_flights import GoogleFlightsProvider
 from app.services.providers.amadeus import AmadeusProvider
+from app.services.providers.apify import ApifyProvider
 from app.utils.rate_limiter import get_remaining
 
 # Monthly window in seconds (also used by search_engine and itinerary_engine)
@@ -25,9 +26,11 @@ MONTHLY_WINDOW: int = 30 * 24 * 3600
 # Monthly limits with safety margin (~10%)
 # serpapi:  250 req/month free tier → limit 230
 # amadeus:  2000 req/month free tier → limit 1800
+# apify:    ~200 actor runs/month on $5 free tier (conservative estimate) → limit 180
 PROVIDER_LIMITS: dict[str, int] = {
     "serpapi": 230,
     "amadeus": 1800,
+    "apify": 180,
 }
 
 # Human-readable notes shown in the frontend badge for each active state
@@ -41,30 +44,40 @@ PROVIDER_NOTES: dict[str, str] = {
         "Results limited to major carriers (Lufthansa, Air France, Iberia…) — "
         "no Ryanair, easyJet or Wizz Air."
     ),
+    "apify": (
+        "SerpAPI and Amadeus quotas exhausted. "
+        "Results from Google Flights via Apify scraper — includes low-cost carriers. "
+        "Response may be slower than usual."
+    ),
     "none": "All flight providers exhausted for this month. Try again next month.",
 }
 
 
 def _all_providers() -> list[tuple[str, FlightProvider]]:
     """Builds the full provider list in cascade order."""
-    return [
+    providers: list[tuple[str, FlightProvider]] = [
         ("serpapi", GoogleFlightsProvider()),
         ("amadeus", AmadeusProvider(settings.amadeus_api_key, settings.amadeus_api_secret)),
     ]
+    # Only include Apify if a token is configured
+    if settings.apify_api_token:
+        providers.append(("apify", ApifyProvider()))
+    return providers
 
 
 async def get_providers_in_order() -> list[tuple[str, FlightProvider]]:
     """
     Returns providers with remaining quota in cascade order.
 
-    If settings.flight_provider is set to a known provider ("serpapi" or "amadeus"),
-    that provider is moved to the front of the list regardless of the default order.
-    Useful in development to force Amadeus (more quota) and preserve SerpAPI credits.
+    If settings.flight_provider is set to a known provider ("serpapi", "amadeus",
+    or "apify"), that provider is moved to the front of the list regardless of the
+    default order. Useful in development to force a specific provider.
 
     Example .env:
-        FLIGHT_PROVIDER=amadeus   → order [amadeus, serpapi]
-        FLIGHT_PROVIDER=serpapi   → order [serpapi, amadeus]  (default)
-        FLIGHT_PROVIDER=cascade   → order [serpapi, amadeus]  (automatic cascade)
+        FLIGHT_PROVIDER=amadeus   → order [amadeus, serpapi, apify]
+        FLIGHT_PROVIDER=apify     → order [apify, serpapi, amadeus]
+        FLIGHT_PROVIDER=serpapi   → order [serpapi, amadeus, apify]  (default)
+        FLIGHT_PROVIDER=cascade   → order [serpapi, amadeus, apify]  (automatic)
 
     Returns an empty list if all providers are exhausted.
     """
