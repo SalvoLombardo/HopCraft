@@ -7,7 +7,9 @@ HopCraft solves two problems no mainstream flight aggregator addresses well:
 - **Reverse Search** — pick a destination, see every cheap flight heading there from all of Europe on a map.
 - **Smart Multi-City** — give it a budget, a trip length, and your home airport; AI suggests complete multi-city itineraries with real verified prices.
 
-> Portfolio project · Python / FastAPI · React / Leaflet · PostgreSQL · Redis · Docker · AWS · Terraform
+> Portfolio project · Python / FastAPI · React / Leaflet · PostgreSQL · Redis · Docker · Railway · Terraform
+
+**[→ Live app on Railway](https://frontend-production-3477.up.railway.app)**
 
 ---
 
@@ -54,7 +56,8 @@ Enter your home airport, trip duration (5–25 days), and budget per person. The
 | LLM (fallback 1) | Groq — Llama 3.3 70B | Free, >300 tok/sec |
 | LLM (fallback 2) | Mistral | 1B tokens/month free |
 | Frontend | React 18 + Vite + react-leaflet | Interactive map with routes and price markers |
-| Infrastructure | AWS EC2 t3.micro + S3 + CloudFront | Terraform, HTTPS via CloudFront (no domain needed) |
+| Infrastructure | Railway (current) | Migrated from AWS after free tier expiry (May 2026) |
+| Infrastructure (original) | AWS EC2 t3.micro + S3 + CloudFront | Terraform IaC in `infra/` — kept for reference |
 | CI/CD | GitHub Actions | Lint (ruff) → test (pytest) → deploy on push to main |
 
 ---
@@ -144,6 +147,19 @@ hopcraft/
 
 ## Architecture Overview
 
+**Current deployment (Railway):**
+
+```
+Railway
+  ├── frontend  (React SPA — static)
+  └── backend   (FastAPI + PostgreSQL + Redis)
+
+Flight data cascade:  SerpAPI → Amadeus
+LLM cascade:          Gemini  → Groq → Mistral
+```
+
+**Original AWS deployment (decommissioned May 2026 — Terraform IaC in `infra/`):**
+
 ```
 CloudFront (*.cloudfront.net — HTTPS, no domain needed)
   ├── /*      → S3 (React SPA)
@@ -155,9 +171,6 @@ EC2 (eu-south-1 — Milan)
       ├── backend :8000
       ├── postgres (persistent volume)
       └── redis
-
-Flight data cascade:  SerpAPI → Amadeus
-LLM cascade:          Gemini  → Groq → Mistral
 ```
 
 For the full architectural breakdown see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
